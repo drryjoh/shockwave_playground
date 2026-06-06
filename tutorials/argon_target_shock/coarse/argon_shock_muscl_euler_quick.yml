@@ -1,4 +1,6 @@
-case_name: argon_shock_muscl_navier_stokes
+# Quick-test version: MUSCL Euler, N=200, short time.
+# Completes in a few seconds.  For production use argon_shock_muscl_euler.yml.
+case_name: argon_shock_muscl_euler_quick
 
 gas: argon
 
@@ -14,7 +16,7 @@ domain.right:
 grid:
   units: cm
   L: 7.600403652e-4
-  n: 2000
+  n: 200
   ghost_cells: 3
 
 initialization:
@@ -32,15 +34,15 @@ initialization:
     velocity: 0.0
 
 solver:
-  cfl: 0.01
-  time_end: 2.0e-09      # shock exits domain at ~2.8 ns; stop before then
+  cfl: 0.1
+  time_end: 2.3352e-09      # shock exits domain at ~2.8 ns; stop before then
   rk: 3
-  viscous_terms: true
-  viscous_dt: false   # use convective CFL only; set true for strict parabolic stability
+  viscous_terms: false
   inviscid_scheme: muscl
   riemann_solver: hllc
   limiter: minmod
 
 diagnostics:
-  log.step: 100
+  log.step: 20
+  snapshot.step: 20      # ~100 steps total → ~5 snapshots
   units: SI

@@ -1,6 +1,4 @@
-# Quick-test version: MUSCL Euler, N=200, short time.
-# Completes in a few seconds.  For production use argon_shock_muscl_euler.yml.
-case_name: argon_shock_muscl_euler_quick
+case_name: argon_shock_ppm_euler_flatten
 
 gas: argon
 
@@ -16,7 +14,7 @@ domain.right:
 grid:
   units: cm
   L: 7.600403652e-4
-  n: 200
+  n: 2000
   ghost_cells: 3
 
 initialization:
@@ -34,15 +32,18 @@ initialization:
     velocity: 0.0
 
 solver:
-  cfl: 0.5
-  time_end: 2.0e-09      # shock exits domain at ~2.8 ns; stop before then
+  cfl: 0.1
+  time_end: 2.3352e-09
   rk: 3
   viscous_terms: false
-  inviscid_scheme: muscl
+  inviscid_scheme: ppm
   riemann_solver: hllc
-  limiter: minmod
+  limiter: ppm
+  flatten: true
+  flatten_z1: 0.75
+  flatten_z2: 0.85
 
 diagnostics:
-  log.step: 20
-  snapshot.step: 20      # ~100 steps total → ~5 snapshots
+  log.step: 100
+  snapshot.step: 500
   units: SI

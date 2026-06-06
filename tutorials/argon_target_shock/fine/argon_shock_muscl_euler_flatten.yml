@@ -1,0 +1,49 @@
+case_name: argon_shock_muscl_euler_flatten
+
+gas: argon
+
+domain.left:
+  type: inflow
+  pressure: 1.56880625e7
+  temperature: 2632.24759509
+  velocity: 1168.9
+
+domain.right:
+  type: outflow
+
+grid:
+  units: cm
+  L: 7.600403652e-4
+  n: 2000
+  ghost_cells: 3
+
+initialization:
+  type: tanh
+  units: SI
+  location: 3.0e-6
+  thickness: 5.0e-8
+  left:
+    pressure: 1.56880625e7
+    temperature: 2632.24759509
+    velocity: 1168.9
+  right:
+    pressure: 5.0e5
+    temperature: 300.0
+    velocity: 0.0
+
+solver:
+  cfl: 0.1
+  time_end: 2.3352e-09
+  rk: 3
+  viscous_terms: false
+  inviscid_scheme: muscl
+  riemann_solver: hllc
+  limiter: minmod
+  flatten: true
+  flatten_z1: 0.75
+  flatten_z2: 0.85
+
+diagnostics:
+  log.step: 100
+  snapshot.step: 500
+  units: SI

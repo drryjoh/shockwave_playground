@@ -1,0 +1,49 @@
+# MUSCL Navier-Stokes, N=200, quick test (no flattening).
+case_name: argon_shock_muscl_ns_quick
+
+gas: argon
+
+domain.left:
+  type: inflow
+  pressure: 1.56880625e7
+  temperature: 2632.24759509
+  velocity: 1168.9
+
+domain.right:
+  type: outflow
+
+grid:
+  units: cm
+  L: 7.600403652e-4
+  n: 200
+  ghost_cells: 3
+
+initialization:
+  type: tanh
+  units: SI
+  location: 3.0e-6
+  thickness: 5.0e-8
+  left:
+    pressure: 1.56880625e7
+    temperature: 2632.24759509
+    velocity: 1168.9
+  right:
+    pressure: 5.0e5
+    temperature: 300.0
+    velocity: 0.0
+
+solver:
+  cfl: 0.1
+  time_end: 2.3352e-09
+  rk: 3
+  viscous_terms: true
+  viscous_dt: false
+  inviscid_scheme: muscl
+  riemann_solver: hllc
+  limiter: minmod
+  flatten: false
+
+diagnostics:
+  log.step: 20
+  snapshot.step: 20
+  units: SI

@@ -141,6 +141,42 @@ static void reconstruct_central(
     }
 }
 
+// ─── CW84/PeleC shock flattening ─────────────────────────────────────────────
+// Returns per-cell flattening coefficient chi[i] in [0,1]:
+//   0 = no flattening (smooth flow or expansion)
+//   1 = fully flattened (face state → cell average)
+//
+// Detection criterion (CW84 §4, PeleC convention):
+//   zeta = |p[i+1] - p[i-1]| / max(tiny, |p[i+2] - p[i-2]|)
+//   chi_i = ramp(zeta, z1, z2)  *only* where u[i+1] - u[i-1] < 0 (compressing)
+// A max-spread over {i-1, i, i+1} then ensures the shock foot cells are also
+// flattened (avoids a hard edge between flattened and unflattened cells).
+static std::vector<double> compute_flattening(
+    const std::vector<double>& p,
+    const std::vector<double>& u,
+    int n, double z1, double z2)
+{
+    std::vector<double> chi(n, 0.0);
+
+    for (int i = 2; i < n - 2; ++i) {
+        // Skip expansions — flattening is for shocks only.
+        if (u[i+1] - u[i-1] >= 0.0) continue;
+
+        const double dp_near = std::abs(p[i+1] - p[i-1]);
+        const double dp_far  = std::abs(p[i+2] - p[i-2]);
+        if (dp_far < 1e-14) continue;
+
+        const double zeta = dp_near / dp_far;
+        chi[i] = std::max(0.0, std::min(1.0, (zeta - z1) / (z2 - z1)));
+    }
+
+    // Spread to neighbours so shock foot cells are included.
+    std::vector<double> out(n, 0.0);
+    for (int i = 1; i < n - 1; ++i)
+        out[i] = std::max({chi[i-1], chi[i], chi[i+1]});
+    return out;
+}
+
 // ─── Main entry point ─────────────────────────────────────────────────────────
 void reconstruct(
     const std::vector<double>& rho,
@@ -152,7 +188,10 @@ void reconstruct(
     double         gamma,
     int            face_begin,
     int            face_end,
-    FaceStates&    fs)
+    FaceStates&    fs,
+    bool           flatten,
+    double         flatten_z1,
+    double         flatten_z2)
 {
     switch (scheme) {
         case InviscidScheme::Central:
@@ -178,6 +217,27 @@ void reconstruct(
 
         default:
             throw std::runtime_error("reconstruct: unknown scheme.");
+    }
+
+    // ── CW84/PeleC flattening (optional) ─────────────────────────────────────
+    // Applied to PPM and MUSCL only (Central is already dissipative enough).
+    // Blends primitive face states toward the upwind cell average near shocks,
+    // mimicking the PeleC behaviour where shocks are captured rather than resolved.
+    if (flatten && scheme != InviscidScheme::Central) {
+        const int n = static_cast<int>(p.size());
+        const auto chi = compute_flattening(p, u, n, flatten_z1, flatten_z2);
+        for (int f = face_begin; f < face_end; ++f) {
+            const double cf  = chi[f];      // left state contributed by cell f
+            const double cf1 = chi[f + 1];  // right state contributed by cell f+1
+            fs.rho_L[f] = (1.0 - cf)  * fs.rho_L[f] + cf  * rho[f];
+            fs.u_L[f]   = (1.0 - cf)  * fs.u_L[f]   + cf  * u[f];
+            fs.p_L[f]   = (1.0 - cf)  * fs.p_L[f]   + cf  * p[f];
+            fs.T_L[f]   = (1.0 - cf)  * fs.T_L[f]   + cf  * T[f];
+            fs.rho_R[f] = (1.0 - cf1) * fs.rho_R[f] + cf1 * rho[f + 1];
+            fs.u_R[f]   = (1.0 - cf1) * fs.u_R[f]   + cf1 * u[f + 1];
+            fs.p_R[f]   = (1.0 - cf1) * fs.p_R[f]   + cf1 * p[f + 1];
+            fs.T_R[f]   = (1.0 - cf1) * fs.T_R[f]   + cf1 * T[f + 1];
+        }
     }
 
     // Fill conservative face states from primitives (needed by Riemann solver)

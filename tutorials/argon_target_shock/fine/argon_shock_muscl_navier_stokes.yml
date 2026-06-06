@@ -1,0 +1,47 @@
+case_name: argon_shock_muscl_navier_stokes
+
+gas: argon
+
+domain.left:
+  type: inflow
+  pressure: 1.56880625e7
+  temperature: 2632.24759509
+  velocity: 1168.9
+
+domain.right:
+  type: outflow
+
+grid:
+  units: cm
+  L: 7.600403652e-4
+  n: 2000
+  ghost_cells: 3
+
+initialization:
+  type: tanh
+  units: SI
+  location: 3.0e-6
+  thickness: 5.0e-8
+  left:
+    pressure: 1.56880625e7
+    temperature: 2632.24759509
+    velocity: 1168.9
+  right:
+    pressure: 5.0e5
+    temperature: 300.0
+    velocity: 0.0
+
+solver:
+  cfl: 0.1
+  time_end: 2.3352e-09      # shock exits domain at ~2.8 ns; stop before then
+  rk: 3
+  viscous_terms: true
+  viscous_dt: false   # use convective CFL only; set true for strict parabolic stability
+  inviscid_scheme: muscl
+  riemann_solver: hllc
+  limiter: minmod
+
+diagnostics:
+  log.step: 100
+  snapshot.step: 500
+  units: SI

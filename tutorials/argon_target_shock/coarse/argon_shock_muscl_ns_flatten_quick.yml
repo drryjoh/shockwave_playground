@@ -1,4 +1,5 @@
-case_name: argon_shock_ppm_euler
+# MUSCL Navier-Stokes + CW84 flattening, N=200, quick test.
+case_name: argon_shock_muscl_ns_flatten_quick
 
 gas: argon
 
@@ -14,7 +15,7 @@ domain.right:
 grid:
   units: cm
   L: 7.600403652e-4
-  n: 2000
+  n: 200
   ghost_cells: 3
 
 initialization:
@@ -32,14 +33,19 @@ initialization:
     velocity: 0.0
 
 solver:
-  cfl: 0.01
-  time_end: 2.0e-09      # shock exits domain at ~2.8 ns; stop before then
+  cfl: 0.1
+  time_end: 2.3352e-09
   rk: 3
-  viscous_terms: false
-  inviscid_scheme: ppm
+  viscous_terms: true
+  viscous_dt: false
+  inviscid_scheme: muscl
   riemann_solver: hllc
-  limiter: ppm
+  limiter: minmod
+  flatten: true
+  flatten_z1: 0.75
+  flatten_z2: 0.85
 
 diagnostics:
-  log.step: 100
+  log.step: 20
+  snapshot.step: 20
   units: SI

@@ -51,7 +51,8 @@ void compute_residual(
 
     reconstruct(s.rho, s.u, s.p, s.T,
                 cfg.inviscid_scheme, cfg.limiter, gas.gamma,
-                face_begin, face_end, fs);
+                face_begin, face_end, fs,
+                cfg.flatten, cfg.flatten_z1, cfg.flatten_z2);
 
     // ── Inviscid flux assembly ────────────────────────────────────────────────
     std::vector<Flux3> inv_flux(n);

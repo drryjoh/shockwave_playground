@@ -107,6 +107,18 @@ def main():
     axes = axes.flatten()
     plot_vars = ["rho", "u", "p", "T", "Mach", "mu"]
 
+    # Auto-detect shock x-centre from density in the first available dataset.
+    shock_centre_um = None
+    for case_name, *_ in CASES:
+        if case_name in datasets:
+            d0   = datasets[case_name]
+            rho  = d0["rho"]
+            x_um = d0["x"] * 1e6
+            mid  = 0.5 * (rho.min() + rho.max())
+            idx  = np.argmin(np.abs(rho - mid))
+            shock_centre_um = x_um[idx]
+            break
+
     for ax, var in zip(axes, plot_vars):
         for case_name, label, color, ls, lw in CASES:
             if case_name not in datasets:
@@ -119,6 +131,8 @@ def main():
         ax.set_title(LABELS.get(var, var))
         ax.legend(fontsize=7)
         ax.grid(True, alpha=0.3)
+        if shock_centre_um is not None:
+            ax.set_xlim([shock_centre_um - 0.2, shock_centre_um + 0.2])
 
     fig.suptitle("SPLAY: Argon shock comparison (M≈5.03)", fontsize=13)
     plt.tight_layout()

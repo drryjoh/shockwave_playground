@@ -63,6 +63,11 @@ struct SolverConfig {
     InviscidScheme inviscid_scheme   = InviscidScheme::Central;
     RiemannSolver  riemann_solver    = RiemannSolver::Central;
     Limiter        limiter           = Limiter::None;
+    // CW84/PeleC-style shock flattening: blends face states toward cell averages
+    // near strong shocks (detected by pressure-ratio criterion + converging flow).
+    bool   flatten    = false;  // enable flattening
+    double flatten_z1 = 0.75;   // lower pressure-ratio threshold (start of ramp)
+    double flatten_z2 = 0.85;   // upper pressure-ratio threshold (fully flattened)
 };
 
 // ─── Diagnostics ──────────────────────────────────────────────────────────────
