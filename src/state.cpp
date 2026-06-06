@@ -70,4 +70,27 @@ void init_tanh(State& s, const Mesh& m, const GasModel& gas,
     }
 }
 
+void init_gaussian_perturbation(State& s, const Mesh& m, const GasModel& gas,
+                                 double p0, double T0, double u0,
+                                 double amplitude, double x0, double sigma)
+{
+    const double rho0 = p0 / (gas.R * T0);
+    const int n = m.n_total;
+    for (int i = 0; i < n; ++i) {
+        const double x   = m.x_cell[i];
+        const double xi  = (x - x0) / sigma;
+        const double p   = p0 * (1.0 + amplitude * std::exp(-xi * xi));
+        // Density stays at rho0; temperature and pressure vary together.
+        const double T   = p / (gas.R * rho0);
+        const double e   = gas.cv * T;
+        const double E   = e + 0.5 * u0 * u0;
+        s.rho[i]  = rho0;
+        s.rhou[i] = rho0 * u0;
+        s.rhoE[i] = rho0 * E;
+        s.p[i]    = p;
+        s.T[i]    = T;
+        s.u[i]    = u0;
+    }
+}
+
 } // namespace splay

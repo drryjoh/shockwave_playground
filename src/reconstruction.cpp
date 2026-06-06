@@ -110,6 +110,14 @@ static void reconstruct_ppm_scalar(
             if (dq * (dq - q6) < 0.0) aR[i] = 3.0 * q[i] - 2.0 * aL[i];
             if (dq * (dq + q6) < 0.0) aL[i] = 3.0 * q[i] - 2.0 * aR[i];
         }
+        // Clamp to range of adjacent cell averages so the parabola cannot
+        // produce values that could cause negative internal energy or density
+        // at a sharp discontinuity (CW84 constraints alone are insufficient
+        // when the 4th-order interpolation produces large initial overshoots).
+        const double lo = std::min({q[i-1], q[i], q[i+1]});
+        const double hi = std::max({q[i-1], q[i], q[i+1]});
+        aL[i] = std::max(lo, std::min(hi, aL[i]));
+        aR[i] = std::max(lo, std::min(hi, aR[i]));
     }
 
     // Step 3: left state at face f is aR[f]; right state is aL[f+1].

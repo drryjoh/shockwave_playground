@@ -26,16 +26,19 @@ struct BCState {
 // ─── Initialization ───────────────────────────────────────────────────────────
 struct InitConfig {
     std::string type      = "tanh";
-    double      location  = 0.0;   // m (shock centre)
+    double      location  = 0.0;   // m (shock centre / Gaussian centre)
     double      thickness = 1e-8;  // m (tanh half-width delta)
-    // Left (post-shock) primitive state
+    // Left primitive state (post-shock for tanh; base state for gaussian_perturbation)
     double p_left  = 0.0;
     double T_left  = 0.0;
     double u_left  = 0.0;
-    // Right (pre-shock) primitive state
+    // Right primitive state (pre-shock for tanh; unused for gaussian_perturbation)
     double p_right = 0.0;
     double T_right = 0.0;
     double u_right = 0.0;
+    // Gaussian perturbation parameters
+    double amplitude = 1e-4;  // fractional amplitude of pressure perturbation
+    double sigma     = 1e-2;  // m (Gaussian half-width)
 };
 
 // ─── Grid ─────────────────────────────────────────────────────────────────────

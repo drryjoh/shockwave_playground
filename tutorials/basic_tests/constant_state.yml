@@ -1,0 +1,50 @@
+# Constant state: uniform supersonic argon flow (rho≈1 kg/m³, M=1.5, p=101325 Pa).
+# Purpose: verify solver preserves a uniform state exactly (zero residual).
+# Expected result: rho, p, u, T constant in time at their initial values.
+case_name: basic_constant_state
+
+gas: argon
+
+# Inflow at left maintains the uniform state; outflow at right is passive.
+domain.left:
+  type: inflow
+  pressure: 101325.0
+  temperature: 486.8       # T = p / (rho * R_argon) ≈ 101325 / (1 * 208.13) = 486.8 K → rho≈1 kg/m³
+  velocity: 617.0          # M ≈ 1.5 (c = sqrt(5/3 * 101325 / 1) ≈ 411 m/s)
+
+domain.right:
+  type: outflow
+
+grid:
+  units: m
+  L: 1.0
+  n: 100
+  ghost_cells: 3
+
+initialization:
+  type: tanh
+  units: SI
+  location: 0.5
+  thickness: 1.0e-6        # negligibly thin — left=right so profile is exactly uniform
+  left:
+    pressure: 101325.0
+    temperature: 486.8
+    velocity: 617.0
+  right:
+    pressure: 101325.0
+    temperature: 486.8
+    velocity: 617.0
+
+solver:
+  cfl: 0.5
+  time_end: 5.0e-4         # ~0.31 domain crossings; flow crosses 1 m in ~1.6 ms
+  rk: 3
+  viscous_terms: false
+  inviscid_scheme: muscl
+  riemann_solver: hllc
+  limiter: minmod
+
+diagnostics:
+  log.step: 50
+  snapshot.step: 50
+  units: SI

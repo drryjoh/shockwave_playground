@@ -168,27 +168,51 @@ Config load_config(const std::string& yaml_path, const std::string& restart_path
     if (!init_node) throw std::runtime_error("Missing 'initialization' section.");
     {
         std::string init_units = optional<std::string>(init_node, "units", "SI");
-        cfg.init.type      = optional<std::string>(init_node, "type", "tanh");
-        cfg.init.location  = required<double>(init_node, "location");   // in init_units
-        cfg.init.thickness = required<double>(init_node, "thickness");  // in init_units
+        cfg.init.type = optional<std::string>(init_node, "type", "tanh");
 
-        // Convert to SI if needed
-        if (init_units != "SI" && init_units != "m") {
-            cfg.init.location  = to_si_length(cfg.init.location,  init_units);
-            cfg.init.thickness = to_si_length(cfg.init.thickness, init_units);
+        if (cfg.init.type == "tanh") {
+            cfg.init.location  = required<double>(init_node, "location");   // in init_units
+            cfg.init.thickness = required<double>(init_node, "thickness");  // in init_units
+
+            if (init_units != "SI" && init_units != "m") {
+                cfg.init.location  = to_si_length(cfg.init.location,  init_units);
+                cfg.init.thickness = to_si_length(cfg.init.thickness, init_units);
+            }
+
+            auto lft = init_node["left"];
+            auto rgt = init_node["right"];
+            if (!lft || !rgt)
+                throw std::runtime_error("initialization: tanh requires 'left' and 'right' sub-blocks.");
+
+            cfg.init.p_left  = required<double>(lft, "pressure");
+            cfg.init.T_left  = required<double>(lft, "temperature");
+            cfg.init.u_left  = required<double>(lft, "velocity");
+            cfg.init.p_right = required<double>(rgt, "pressure");
+            cfg.init.T_right = required<double>(rgt, "temperature");
+            cfg.init.u_right = required<double>(rgt, "velocity");
+
+        } else if (cfg.init.type == "gaussian_perturbation") {
+            cfg.init.location  = required<double>(init_node, "location");  // centre x0
+            cfg.init.sigma     = required<double>(init_node, "sigma");     // Gaussian half-width
+            cfg.init.amplitude = optional<double>(init_node, "amplitude", 1e-4);
+
+            if (init_units != "SI" && init_units != "m") {
+                cfg.init.location = to_si_length(cfg.init.location, init_units);
+                cfg.init.sigma    = to_si_length(cfg.init.sigma,    init_units);
+            }
+
+            auto lft = init_node["left"];
+            if (!lft)
+                throw std::runtime_error("initialization: gaussian_perturbation requires a 'left' sub-block for the base state.");
+
+            cfg.init.p_left = required<double>(lft, "pressure");
+            cfg.init.T_left = required<double>(lft, "temperature");
+            cfg.init.u_left = required<double>(lft, "velocity");
+
+        } else {
+            throw std::runtime_error("initialization: unknown type '" + cfg.init.type +
+                                     "'. Supported: tanh, gaussian_perturbation.");
         }
-
-        auto lft = init_node["left"];
-        auto rgt = init_node["right"];
-        if (!lft || !rgt)
-            throw std::runtime_error("initialization: missing 'left' or 'right' sub-block.");
-
-        cfg.init.p_left  = required<double>(lft, "pressure");
-        cfg.init.T_left  = required<double>(lft, "temperature");
-        cfg.init.u_left  = required<double>(lft, "velocity");
-        cfg.init.p_right = required<double>(rgt, "pressure");
-        cfg.init.T_right = required<double>(rgt, "temperature");
-        cfg.init.u_right = required<double>(rgt, "velocity");
     }
 
     // ── Diagnostics ──

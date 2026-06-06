@@ -1,0 +1,46 @@
+# Small pressure perturbation: Gaussian pulse in an otherwise uniform medium.
+# p(x) = p0 * (1 + 1e-4 * exp(-((x - 0.5)/0.05)^2))
+# Purpose: verify linear acoustic propagation — pulse should split into two
+#          equal-amplitude acoustic waves travelling at ±c ≈ ±411 m/s.
+# Expected result: two symmetric humps separating at c≈411 m/s.
+case_name: basic_pressure_perturbation
+
+gas: argon
+
+# Both boundaries are outflow (passive) — no inflow driving.
+domain.left:
+  type: outflow
+
+domain.right:
+  type: outflow
+
+grid:
+  units: m
+  L: 1.0
+  n: 200
+  ghost_cells: 3
+
+initialization:
+  type: gaussian_perturbation
+  units: SI
+  location: 0.5            # centre of Gaussian at x=0.5 m
+  sigma: 0.05              # half-width = 5 cm
+  amplitude: 1.0e-4        # fractional pressure amplitude (linear regime)
+  left:                    # base uniform state
+    pressure: 101325.0
+    temperature: 486.8     # rho = p/(R*T) ≈ 1 kg/m³
+    velocity: 0.0          # fluid at rest
+
+solver:
+  cfl: 0.5
+  time_end: 8.0e-4         # waves travel ±411*8e-4 = ±0.33 m; still inside domain
+  rk: 3
+  viscous_terms: false
+  inviscid_scheme: muscl
+  riemann_solver: hllc
+  limiter: minmod
+
+diagnostics:
+  log.step: 50
+  snapshot.step: 50
+  units: SI

@@ -42,4 +42,11 @@ void init_tanh(State& s, const Mesh& m, const GasModel& gas,
                double p_R, double T_R, double u_R,
                double x_shock, double delta);
 
+/// Initialize state as uniform base + small Gaussian pressure perturbation.
+/// p(x) = p0 * (1 + amplitude * exp(-((x-x0)/sigma)^2))
+/// Density is held constant at p0/(R*T0); temperature varies with pressure.
+void init_gaussian_perturbation(State& s, const Mesh& m, const GasModel& gas,
+                                 double p0, double T0, double u0,
+                                 double amplitude, double x0, double sigma);
+
 } // namespace splay

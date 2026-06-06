@@ -1,0 +1,51 @@
+# Contact discontinuity: rho_L=1, rho_R=2, same p=101325 Pa and u=617 m/s.
+# Purpose: verify a contact discontinuity convects at u without generating
+#          spurious pressure waves or oscillations.
+# Expected result: density jump convects rightward at 617 m/s, p stays flat.
+case_name: basic_contact_disc
+
+gas: argon
+
+# Inflow: left (low-density) state.
+domain.left:
+  type: inflow
+  pressure: 101325.0
+  temperature: 486.8       # rho_L = p/(R*T) ≈ 1 kg/m³
+  velocity: 617.0
+
+domain.right:
+  type: outflow
+
+grid:
+  units: m
+  L: 1.0
+  n: 200
+  ghost_cells: 3
+
+initialization:
+  type: tanh
+  units: SI
+  location: 0.5            # contact at domain centre
+  thickness: 5.0e-3        # 5 mm tanh width (~1% of domain)
+  left:
+    pressure: 101325.0
+    temperature: 486.8     # rho_L ≈ 1 kg/m³
+    velocity: 617.0
+  right:
+    pressure: 101325.0
+    temperature: 243.4     # rho_R = p/(R*T) ≈ 2 kg/m³  (T_R = T_L/2)
+    velocity: 617.0        # same velocity → pure contact, no shock/fan
+
+solver:
+  cfl: 0.5
+  time_end: 4.0e-4         # contact moves 617*4e-4 = 0.247 m → from 0.5 to 0.75, still in domain
+  rk: 3
+  viscous_terms: false
+  inviscid_scheme: muscl
+  riemann_solver: hllc
+  limiter: minmod
+
+diagnostics:
+  log.step: 50
+  snapshot.step: 50
+  units: SI
