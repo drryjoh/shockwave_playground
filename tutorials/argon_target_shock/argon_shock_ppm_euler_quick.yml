@@ -1,4 +1,6 @@
-case_name: argon_shock_central_navier_stokes
+# Quick-test version: PPM Euler, N=200, short time.
+# Completes in a few seconds.  For production use argon_shock_ppm_euler.yml.
+case_name: argon_shock_ppm_euler_quick
 
 gas: argon
 
@@ -14,7 +16,7 @@ domain.right:
 grid:
   units: cm
   L: 7.600403652e-4
-  n: 2000
+  n: 200
   ghost_cells: 3
 
 initialization:
@@ -32,15 +34,14 @@ initialization:
     velocity: 0.0
 
 solver:
-  cfl: 0.01
-  time_end: 7.433391691866941e-07
+  cfl: 0.5
+  time_end: 1.0e-08
   rk: 3
-  viscous_terms: true
-  viscous_dt: false   # use convective CFL only; set true for strict parabolic stability
-  inviscid_scheme: central
-  riemann_solver: none
-  limiter: none
+  viscous_terms: false
+  inviscid_scheme: ppm
+  riemann_solver: hllc
+  limiter: ppm
 
 diagnostics:
-  log.step: 100
+  log.step: 10
   units: SI

@@ -1,0 +1,3 @@
+# Output from tutorial runs is ignored here.
+# To track a result, add an exception in the root .gitignore.
+output/

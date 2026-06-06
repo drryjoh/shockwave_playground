@@ -123,6 +123,7 @@ Config load_config(const std::string& yaml_path, const std::string& restart_path
         cfg.solver.time_end      = required<double>(solver_node, "time_end");
         cfg.solver.rk_order      = optional<int>(solver_node, "rk", 3);
         cfg.solver.viscous_terms = optional<bool>(solver_node, "viscous_terms", true);
+        cfg.solver.viscous_dt    = optional<bool>(solver_node, "viscous_dt",    true);
 
         std::string inv = optional<std::string>(solver_node, "inviscid_scheme", "central");
         std::string rs  = optional<std::string>(solver_node, "riemann_solver",  "none");

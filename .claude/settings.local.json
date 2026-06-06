@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python3 -c ':*)"
+      "Bash(python3 -c ':*)",
+      "Bash(cmake -S . -B build -DSPLAY_ENABLE_MPI=OFF -DCMAKE_BUILD_TYPE=Release)"
     ]
   }
 }

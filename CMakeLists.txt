@@ -15,8 +15,28 @@ option(SPLAY_BUILD_TESTS "Build unit tests"                  ON)
 # ────────────────────────────────────────────────────────────
 # Dependencies
 # ────────────────────────────────────────────────────────────
-# yaml-cpp  (header-only mode or shared lib)
-find_package(yaml-cpp REQUIRED)
+include(FetchContent)
+
+# yaml-cpp 0.8.0 uses cmake_minimum_required(2.8.12) which triggers a
+# deprecation error in CMake >= 3.27.  Set the policy minimum before
+# FetchContent pulls it so the subdirectory configure succeeds.
+if(NOT DEFINED CMAKE_POLICY_VERSION_MINIMUM)
+    set(CMAKE_POLICY_VERSION_MINIMUM "3.5" CACHE STRING
+        "Minimum CMake policy version for third-party deps" FORCE)
+endif()
+
+# yaml-cpp: fetched automatically; no system install required.
+FetchContent_Declare(
+    yaml-cpp
+    GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
+    GIT_TAG        0.8.0
+    GIT_SHALLOW    TRUE
+)
+set(YAML_CPP_BUILD_TESTS     OFF CACHE BOOL "" FORCE)
+set(YAML_CPP_BUILD_TOOLS     OFF CACHE BOOL "" FORCE)
+set(YAML_CPP_BUILD_CONTRIB   OFF CACHE BOOL "" FORCE)
+set(YAML_CPP_INSTALL         OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(yaml-cpp)
 
 if(SPLAY_ENABLE_MPI)
     find_package(MPI REQUIRED)
@@ -55,7 +75,7 @@ target_include_directories(splay_core
         $<INSTALL_INTERFACE:include>
 )
 
-target_link_libraries(splay_core PUBLIC yaml-cpp)
+target_link_libraries(splay_core PUBLIC yaml-cpp::yaml-cpp)
 
 if(SPLAY_ENABLE_MPI)
     target_link_libraries(splay_core PUBLIC MPI::MPI_CXX)

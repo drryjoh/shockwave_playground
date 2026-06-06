@@ -36,6 +36,7 @@ solver:
   time_end: 7.433391691866941e-07
   rk: 3
   viscous_terms: true
+  viscous_dt: false   # use convective CFL only; set true for strict parabolic stability
   inviscid_scheme: ppm
   riemann_solver: hllc
   limiter: ppm

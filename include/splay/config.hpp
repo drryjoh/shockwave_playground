@@ -48,13 +48,18 @@ struct GridConfig {
 
 // ─── Solver ───────────────────────────────────────────────────────────────────
 struct SolverConfig {
-    double         cfl            = 0.5;
-    double         time_end       = 1.0;
-    int            rk_order       = 3;
-    bool           viscous_terms  = true;
-    InviscidScheme inviscid_scheme = InviscidScheme::Central;
-    RiemannSolver  riemann_solver  = RiemannSolver::Central;
-    Limiter        limiter         = Limiter::None;
+    double         cfl              = 0.5;
+    double         time_end         = 1.0;
+    int            rk_order         = 3;
+    bool           viscous_terms    = true;
+    // When true (default), the viscous parabolic stability restriction
+    // dt <= dx^2/nu is included in the timestep calculation.
+    // Set to false to use only the convective CFL even when viscous_terms=true.
+    // NOTE: disabling viscous_dt may cause instability if dt >> dx^2/nu.
+    bool           viscous_dt       = true;
+    InviscidScheme inviscid_scheme   = InviscidScheme::Central;
+    RiemannSolver  riemann_solver    = RiemannSolver::Central;
+    Limiter        limiter           = Limiter::None;
 };
 
 // ─── Diagnostics ──────────────────────────────────────────────────────────────

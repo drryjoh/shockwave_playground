@@ -106,7 +106,7 @@ double compute_dt(
         if (lam > 1e-14)
             dt_conv = std::min(dt_conv, dx / lam);
 
-        if (cfg.viscous_terms) {
+        if (cfg.viscous_terms && cfg.viscous_dt) {
             const double mu    = tm.viscosity(s.T[i]);
             const double kappa = tm.conductivity(s.T[i]);
             const double nu    = mu / s.rho[i];

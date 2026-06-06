@@ -1,0 +1,37 @@
+# Build artifacts
+build/
+*.o
+*.a
+*.so
+*.dylib
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+install_manifest.txt
+CTestTestfile.cmake
+
+# SPLAY runtime output (all tutorial output is ignored by default)
+output/
+
+# Restart files written during runs
+*/restart/
+
+# Generated transport header (regenerate with generate_transport_fits.py)
+include/splay/transport_coeffs.hpp
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*~

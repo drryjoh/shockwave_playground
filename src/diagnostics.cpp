@@ -62,6 +62,10 @@ void print_banner(const Config& cfg, int nranks) {
                   << ": " << limiter_name(cfg.solver.limiter) << "\n";
         std::cout << std::setw(30) << "  Viscous terms"
                   << ": " << (cfg.solver.viscous_terms ? "YES (Navier-Stokes)" : "NO (Euler)") << "\n";
+        if (cfg.solver.viscous_terms) {
+            std::cout << std::setw(30) << "  Viscous dt constraint"
+                      << ": " << (cfg.solver.viscous_dt ? "ON (parabolic CFL)" : "OFF (convective only)") << "\n";
+        }
         std::cout << std::setw(30) << "  CFL"
                   << ": " << cfg.solver.cfl << "\n";
         std::cout << std::setw(30) << "  Final time [s]"
