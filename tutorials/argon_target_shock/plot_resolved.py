@@ -103,6 +103,16 @@ def main():
         print("  bash tutorials/argon_target_shock/fine/run.sh --no-plot")
         sys.exit(1)
 
+    # Load MD data (x in metres, T in K) — temperature only
+    md_path = os.path.join(SCRIPT_DIR, "MD_data.txt")
+    md_data = None
+    if os.path.exists(md_path):
+        md_arr = np.loadtxt(md_path)
+        md_data = {"x": md_arr[:, 0], "T": md_arr[:, 1]}
+        print(f"  MD data: {len(md_arr)} points loaded from {md_path}")
+    else:
+        print(f"  [skip] MD data not found at {md_path}")
+
     n_vars = len(VARS)
     fig, axes = plt.subplots(1, n_vars, figsize=(5.0 * n_vars, 5.0))
     if n_vars == 1:
@@ -127,6 +137,16 @@ def main():
             ax.plot(x_r[mask], d[col_key][mask],
                     color=color, ls=ls, lw=lw, label=label, alpha=0.9)
 
+        # Overlay MD temperature data on the T panel only
+        if col_key == "T" and md_data is not None:
+            x_c = shock_centre(next(iter(datasets.values())))
+            x_md_rel = (md_data["x"] - x_c) * 1e6
+            mask = np.abs(x_md_rel) <= half_um
+            if mask.any():
+                ax.scatter(x_md_rel[mask], md_data["T"][mask],
+                           s=8, color="tab:green", marker="o",
+                           zorder=5, label="MD", alpha=0.8)
+
         ax.set_xlabel("x − x_shock  [µm]", fontsize=10)
         ax.set_ylabel(ylabel, fontsize=10)
         ax.set_xlim(-half_um, half_um)
@@ -135,7 +155,9 @@ def main():
         ax.tick_params(labelsize=9)
         ax.axvline(0, color="k", lw=0.6, ls=":", alpha=0.4)  # mark shock centre
 
+    # Legend on T panel (last axis) to include MD entry; rho panel gets scheme legend
     axes[0].legend(fontsize=9, loc="upper left")
+    axes[-1].legend(fontsize=9, loc="upper left")
 
     plt.tight_layout()
 
