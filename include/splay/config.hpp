@@ -64,9 +64,10 @@ struct SolverConfig {
 
 // ─── Diagnostics ──────────────────────────────────────────────────────────────
 struct DiagConfig {
-    int         log_step   = 100;
-    std::string units      = "SI";
-    std::string output_dir = "output";
+    int         log_step      = 100;  // print to stdout every N steps
+    int         snapshot_step = 0;    // write CSV snapshot every N steps (0 = only initial+final)
+    std::string units         = "SI";
+    std::string output_dir    = "output";
 };
 
 // ─── Top-level configuration ─────────────────────────────────────────────────

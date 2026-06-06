@@ -35,7 +35,7 @@ initialization:
 
 solver:
   cfl: 0.5
-  time_end: 1.0e-08
+  time_end: 2.0e-09      # shock exits domain at ~2.8 ns; stop before then
   rk: 3
   viscous_terms: false
   inviscid_scheme: muscl
@@ -43,5 +43,6 @@ solver:
   limiter: minmod
 
 diagnostics:
-  log.step: 10
+  log.step: 20
+  snapshot.step: 20      # ~100 steps total → ~5 snapshots
   units: SI

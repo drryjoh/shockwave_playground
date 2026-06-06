@@ -78,11 +78,16 @@ static void reconstruct_ppm_scalar(
 {
     const int n = static_cast<int>(q.size());
 
-    // Step 1: build interface values q_{i+1/2} using 4th-order interpolation.
-    // q_{i+1/2} = (7*(q_i + q_{i+1}) - (q_{i-1} + q_{i+2})) / 12
+    // Step 1: build interface values q_{i+1/2} using 4th-order interpolation,
+    // then clamp to the monotone range to prevent negative density/pressure at
+    // strong discontinuities (C&W 1984 §2; same as many production PPM codes).
     std::vector<double> qi_half(n, 0.0);
     for (int i = 1; i < n - 2; ++i) {
         qi_half[i] = (7.0 * (q[i] + q[i+1]) - (q[i-1] + q[i+2])) / 12.0;
+        // Monotone clamp: keep interface value between the two adjacent averages.
+        const double qlo = std::min(q[i], q[i+1]);
+        const double qhi = std::max(q[i], q[i+1]);
+        qi_half[i] = std::max(qlo, std::min(qhi, qi_half[i]));
     }
 
     // Step 2: PPM monotonicity constraint on cell-average parabola.
@@ -102,8 +107,8 @@ static void reconstruct_ppm_scalar(
             // dq = aR - aL
             double dq = aR[i] - aL[i];
             double q6 = 6.0 * (q[i] - 0.5 * (aL[i] + aR[i]));
-            if (dq * (dq - q6) < 0.0) aL[i] = 3.0 * q[i] - 2.0 * aR[i];
-            if (dq * (dq + q6) < 0.0) aR[i] = 3.0 * q[i] - 2.0 * aL[i];
+            if (dq * (dq - q6) < 0.0) aR[i] = 3.0 * q[i] - 2.0 * aL[i];
+            if (dq * (dq + q6) < 0.0) aL[i] = 3.0 * q[i] - 2.0 * aR[i];
         }
     }
 

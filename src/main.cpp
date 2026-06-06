@@ -101,8 +101,9 @@ int main(int argc, char** argv) {
                          cfg.diagnostics.output_dir, cfg.case_name, step, time);
 
         // ─── Time loop ────────────────────────────────────────────────────────
-        const double t_end   = cfg.solver.time_end;
-        const int    log_step = cfg.diagnostics.log_step;
+        const double t_end         = cfg.solver.time_end;
+        const int    log_step      = cfg.diagnostics.log_step;
+        const int    snapshot_step = cfg.diagnostics.snapshot_step;
 
         while (time < t_end) {
             // Compute stable dt.
@@ -120,6 +121,12 @@ int main(int argc, char** argv) {
 
             time += dt;
             ++step;
+
+            // Periodic snapshots.
+            if (snapshot_step > 0 && step % snapshot_step == 0) {
+                splay::write_csv(s, m, tm, gas, decomp,
+                                 cfg.diagnostics.output_dir, cfg.case_name, step, time);
+            }
 
             // Diagnostics.
             if (step % log_step == 0 || time >= t_end) {

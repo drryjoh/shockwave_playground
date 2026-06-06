@@ -11,13 +11,13 @@ GasModel GasModel::from_name(const std::string& name) {
     if (name == "argon") {
         g.MW    = 0.039948;            // kg/mol
         g.gamma = 5.0 / 3.0;
-        g.R     = 8314.46261815324 / g.MW;  // J/(kg·K)  = 208.13
+        g.R     = 8.31446261815324 / g.MW;   // J/(kg·K)  = 208.13
         g.cv    = g.R / (g.gamma - 1.0);
         g.cp    = g.gamma * g.cv;
     } else if (name == "nitrogen") {
         g.MW    = 0.028014;            // kg/mol
         g.gamma = 7.0 / 5.0;
-        g.R     = 8314.46261815324 / g.MW;  // J/(kg·K)  = 296.80
+        g.R     = 8.31446261815324 / g.MW;   // J/(kg·K)  = 296.80
         g.cv    = g.R / (g.gamma - 1.0);
         g.cp    = g.gamma * g.cv;
     } else {

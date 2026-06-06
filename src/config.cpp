@@ -195,14 +195,17 @@ Config load_config(const std::string& yaml_path, const std::string& restart_path
     auto diag_node = root["diagnostics"];
     {
         // Support dotted key "log.step" or nested "log: step:"
-        int log_step = 100;
+        int log_step = 100, snapshot_step = 0;
         if (diag_node) {
             auto ls_node = get_node(diag_node, "log.step");
             if (ls_node) log_step = ls_node.as<int>();
-            cfg.diagnostics.units      = optional<std::string>(diag_node, "units", "SI");
+            auto ss_node = get_node(diag_node, "snapshot.step");
+            if (ss_node) snapshot_step = ss_node.as<int>();
+            cfg.diagnostics.units = optional<std::string>(diag_node, "units", "SI");
         }
-        cfg.diagnostics.log_step = log_step;
-        cfg.diagnostics.output_dir = optional<std::string>(root, "output_dir", "output");
+        cfg.diagnostics.log_step      = log_step;
+        cfg.diagnostics.snapshot_step = snapshot_step;
+        cfg.diagnostics.output_dir    = optional<std::string>(root, "output_dir", "output");
     }
 
     return cfg;
