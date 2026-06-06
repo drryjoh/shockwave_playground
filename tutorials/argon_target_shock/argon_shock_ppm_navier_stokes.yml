@@ -1,0 +1,45 @@
+case_name: argon_shock_ppm_navier_stokes
+
+gas: argon
+
+domain.left:
+  type: inflow
+  pressure: 1.56880625e7
+  temperature: 2632.24759509
+  velocity: 1168.9
+
+domain.right:
+  type: outflow
+
+grid:
+  units: cm
+  L: 7.600403652e-4
+  n: 2000
+  ghost_cells: 3
+
+initialization:
+  type: tanh
+  units: SI
+  location: 3.0e-6
+  thickness: 5.0e-8
+  left:
+    pressure: 1.56880625e7
+    temperature: 2632.24759509
+    velocity: 1168.9
+  right:
+    pressure: 5.0e5
+    temperature: 300.0
+    velocity: 0.0
+
+solver:
+  cfl: 0.01
+  time_end: 7.433391691866941e-07
+  rk: 3
+  viscous_terms: true
+  inviscid_scheme: ppm
+  riemann_solver: hllc
+  limiter: ppm
+
+diagnostics:
+  log.step: 100
+  units: SI
