@@ -1,4 +1,4 @@
-# PPM Navier-Stokes + CW84 flattening, N=200, quick test.
+# PPM Navier-Stokes + CW84 flattening, N=500, quick test.
 # This is the PeleC-like configuration: flattening forces the shock to be
 # captured as a discontinuity even though viscous terms are enabled.
 # Compare with argon_shock_ppm_ns_quick.yml (no flatten) to see that
@@ -19,7 +19,7 @@ domain.right:
 grid:
   units: cm
   L: 7.600403652e-4
-  n: 200
+  n: 500
   ghost_cells: 3
 
 initialization:

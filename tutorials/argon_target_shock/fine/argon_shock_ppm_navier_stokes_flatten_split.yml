@@ -1,6 +1,4 @@
-# Quick-test version: MUSCL Euler, N=500, short time.
-# Completes in a few seconds.  For production use argon_shock_muscl_euler.yml.
-case_name: argon_shock_muscl_euler_quick
+case_name: argon_shock_ppm_navier_stokes_flatten_split
 
 gas: argon
 
@@ -16,7 +14,7 @@ domain.right:
 grid:
   units: cm
   L: 7.600403652e-4
-  n: 500
+  n: 2000
   ghost_cells: 3
 
 initialization:
@@ -35,14 +33,19 @@ initialization:
 
 solver:
   cfl: 0.1
-  time_end: 2.3352e-09      # shock exits domain at ~2.8 ns; stop before then
+  time_end: 2.3352e-09
   rk: 3
-  viscous_terms: false
-  inviscid_scheme: muscl
+  viscous_terms: true
+  viscous_dt: false
+  inviscid_scheme: ppm
   riemann_solver: hllc
-  limiter: minmod
+  limiter: ppm
+  flatten: true            # CW84/PeleC-style flattening
+  flatten_z1: 0.75
+  flatten_z2: 0.85
+  splitting: true          # Godunov operator splitting: inviscid+flatten first, then viscous
 
 diagnostics:
-  log.step: 20
-  snapshot.step: 20      # ~100 steps total → ~5 snapshots
+  log.step: 100
+  snapshot.step: 500
   units: SI

@@ -68,6 +68,10 @@ struct SolverConfig {
     bool   flatten    = false;  // enable flattening
     double flatten_z1 = 0.75;   // lower pressure-ratio threshold (start of ramp)
     double flatten_z2 = 0.85;   // upper pressure-ratio threshold (fully flattened)
+    // Godunov operator splitting: advance inviscid+flatten first (SSPRK3), then
+    // viscous diffusion separately (explicit Euler).  When false (default) both
+    // operators are combined in the same RK residual each stage.
+    bool   operator_splitting = false;
 };
 
 // ─── Diagnostics ──────────────────────────────────────────────────────────────

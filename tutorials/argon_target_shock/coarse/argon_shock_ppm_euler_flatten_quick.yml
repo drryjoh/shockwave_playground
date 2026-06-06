@@ -1,4 +1,4 @@
-# PPM Euler + CW84 flattening, N=200, quick test.
+# PPM Euler + CW84 flattening, N=500, quick test.
 # Compare with argon_shock_ppm_euler_quick.yml (no flatten) to see the effect
 # of shock flattening on a captured Euler shock.
 case_name: argon_shock_ppm_euler_flatten_quick
@@ -17,7 +17,7 @@ domain.right:
 grid:
   units: cm
   L: 7.600403652e-4
-  n: 200
+  n: 500
   ghost_cells: 3
 
 initialization:

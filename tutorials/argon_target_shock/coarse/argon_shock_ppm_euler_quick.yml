@@ -1,4 +1,4 @@
-# Quick-test version: PPM Euler, N=200, short time.
+# Quick-test version: PPM Euler, N=500, short time.
 # Completes in a few seconds.  For production use argon_shock_ppm_euler.yml.
 case_name: argon_shock_ppm_euler_quick
 
@@ -16,7 +16,7 @@ domain.right:
 grid:
   units: cm
   L: 7.600403652e-4
-  n: 200
+  n: 500
   ghost_cells: 3
 
 initialization:

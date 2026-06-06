@@ -26,7 +26,8 @@ void compute_residual(
     const GasModel&       gas,
     const TransportModel& tm,
     const SolverConfig&   cfg,
-    Residual&             R)
+    Residual&             R,
+    ResidualPart          part)
 {
     R.zero();
 
@@ -35,46 +36,46 @@ void compute_residual(
     const int n  = m.n_total;
     const double dx = m.dx;
 
+    const bool do_inviscid = (part != ResidualPart::ViscousOnly);
+    const bool do_viscous  = (part != ResidualPart::InviscidOnly) && cfg.viscous_terms;
+
     // ── Transport coefficients ────────────────────────────────────────────────
     std::vector<double> mu(n, 0.0), kappa(n, 0.0);
-    if (cfg.viscous_terms) {
+    if (do_viscous) {
         compute_transport(s.T, tm, mu, kappa);
     }
 
-    // ── Face reconstruction ───────────────────────────────────────────────────
-    // Faces: face f is between cell f and f+1.
-    // We need faces from ib-1 to ie-1 (i.e., one face left of interior, one right).
     const int face_begin = ib - 1;
-    const int face_end   = ie;         // exclusive; last interior face is ie-1
-
-    FaceStates fs(n);   // allocated for full n_total; only [face_begin..face_end) used.
-
-    reconstruct(s.rho, s.u, s.p, s.T,
-                cfg.inviscid_scheme, cfg.limiter, gas.gamma,
-                face_begin, face_end, fs,
-                cfg.flatten, cfg.flatten_z1, cfg.flatten_z2);
+    const int face_end   = ie;
 
     // ── Inviscid flux assembly ────────────────────────────────────────────────
-    std::vector<Flux3> inv_flux(n);
-    for (int f = face_begin; f < face_end; ++f) {
-        inv_flux[f] = compute_inviscid_flux(
-            fs.rho_L[f], fs.u_L[f], fs.p_L[f], fs.rhoE_L[f] / fs.rho_L[f],
-            fs.rho_R[f], fs.u_R[f], fs.p_R[f], fs.rhoE_R[f] / fs.rho_R[f],
-            gas.gamma, cfg.riemann_solver);
+    std::vector<Flux3> inv_flux(n, {0.0, 0.0, 0.0});
+    if (do_inviscid) {
+        FaceStates fs(n);
+        reconstruct(s.rho, s.u, s.p, s.T,
+                    cfg.inviscid_scheme, cfg.limiter, gas.gamma,
+                    face_begin, face_end, fs,
+                    cfg.flatten, cfg.flatten_z1, cfg.flatten_z2);
+
+        for (int f = face_begin; f < face_end; ++f) {
+            inv_flux[f] = compute_inviscid_flux(
+                fs.rho_L[f], fs.u_L[f], fs.p_L[f], fs.rhoE_L[f] / fs.rho_L[f],
+                fs.rho_R[f], fs.u_R[f], fs.p_R[f], fs.rhoE_R[f] / fs.rho_R[f],
+                gas.gamma, cfg.riemann_solver);
+        }
     }
 
     // ── Viscous flux assembly ─────────────────────────────────────────────────
     std::vector<Flux3> visc_flux(n, {0.0, 0.0, 0.0});
-    if (cfg.viscous_terms) {
+    if (do_viscous) {
         compute_all_viscous_fluxes(mu, kappa, s.u, s.T, dx,
                                    face_begin, face_end, visc_flux);
     }
 
     // ── Residual: R = -(F_{i+1/2} - F_{i-1/2}) / dx ─────────────────────────
-    // Positive R means the cell gains conserved quantity (dU/dt = R).
     for (int i = ib; i < ie; ++i) {
-        const int fR = i;       // right face of cell i  (between i and i+1)
-        const int fL = i - 1;   // left  face of cell i  (between i-1 and i)
+        const int fR = i;
+        const int fL = i - 1;
 
         R.r_rho[i]  = -(inv_flux[fR][0] - inv_flux[fL][0]) / dx
                       + (visc_flux[fR][0] - visc_flux[fL][0]) / dx;

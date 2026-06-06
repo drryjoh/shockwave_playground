@@ -1,4 +1,4 @@
-# MUSCL Navier-Stokes, N=200, quick test (no flattening).
+# MUSCL Navier-Stokes, N=500, quick test (no flattening).
 case_name: argon_shock_muscl_ns_quick
 
 gas: argon
@@ -15,7 +15,7 @@ domain.right:
 grid:
   units: cm
   L: 7.600403652e-4
-  n: 200
+  n: 500
   ghost_cells: 3
 
 initialization:

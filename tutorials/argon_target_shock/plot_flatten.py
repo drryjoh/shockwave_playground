@@ -50,6 +50,9 @@ PANEL_TITLES = {
     "ns":    "Navier-Stokes — flatten on vs off  (PeleC-like = dashed)",
 }
 
+T_SHOCK_MID = 1500.0   # K — temperature level used to locate shock centre
+HALF_UM     = 0.20     # µm — half-window for plot
+
 
 # ── I/O helpers ───────────────────────────────────────────────────────────────
 def find_latest_csv(case_dir):
@@ -74,6 +77,11 @@ def load_csv(path):
     d   = {col: arr[:, k] for k, col in enumerate(header)}
     idx = np.argsort(d["x"])
     return {k: v[idx] for k, v in d.items()}
+
+
+def shock_centre(d, T_mid=T_SHOCK_MID):
+    """Return x-coordinate [m] where T is closest to T_mid."""
+    return d["x"][np.argmin(np.abs(d["T"] - T_mid))]
 
 
 def shock_thickness(x, rho):
@@ -109,6 +117,30 @@ def main():
         print("  bash tutorials/argon_target_shock/run_flatten.sh")
         sys.exit(1)
 
+    # Load MD data — x already in µm, shock-centred; col 1 = T [K]
+    md_path = os.path.join(SCRIPT_DIR, "MD_data.txt")
+    md_data = None
+    if os.path.exists(md_path):
+        md_arr = np.loadtxt(md_path, delimiter=",")
+        md_data = {"x": md_arr[:, 0], "T": md_arr[:, 1]}
+        print(f"  MD data: {len(md_arr)} points loaded")
+    else:
+        print(f"  [skip] MD data not found at {md_path}")
+
+    # Load DG (p=2) data — x in metres, needs shock-centering
+    dg_dir = os.path.join(SCRIPT_DIR, "DG")
+    dg_data = None
+    dg_x_files = sorted(glob.glob(os.path.join(dg_dir, "x_*.npy")))
+    dg_T_files = sorted(glob.glob(os.path.join(dg_dir, "Temperature_*.npy")))
+    if dg_x_files and dg_T_files:
+        dg_x = np.load(dg_x_files[-1])
+        dg_T = np.load(dg_T_files[-1])
+        dg_xc = dg_x[np.argmin(np.abs(dg_T - T_SHOCK_MID))]
+        dg_data = {"x_rel": (dg_x - dg_xc) * 1e6, "T": dg_T}
+        print(f"  DG data: {len(dg_x)} points loaded, shock@{dg_xc*1e6:.3f} µm")
+    else:
+        print(f"  [skip] DG data not found in {dg_dir}")
+
     panels = ["euler", "ns"]
     n_vars   = len(VARS)
     n_panels = len(panels)
@@ -132,19 +164,38 @@ def main():
             for case_name, label, color, ls, case_panel in CASES:
                 if case_panel != panel or case_name not in datasets:
                     continue
-                d  = datasets[case_name]
-                x_um = d["x"] * 1e6
+                d    = datasets[case_name]
+                xc   = shock_centre(d)
+                x_r  = (d["x"] - xc) * 1e6   # µm, shock-centred
+                mask = np.abs(x_r) <= HALF_UM
                 lw = 2.0 if ls == "-" else 1.5
-                ax.plot(x_um, d[col_key], color=color, ls=ls, lw=lw,
+                ax.plot(x_r[mask], d[col_key][mask], color=color, ls=ls, lw=lw,
                         label=label, alpha=0.9)
                 plotted = True
 
-            ax.set_xlabel("x  [µm]", fontsize=9)
+            # Overlay reference data on T panels only
+            if col_key == "T":
+                if md_data is not None:
+                    mask = np.abs(md_data["x"]) <= HALF_UM
+                    if mask.any():
+                        ax.scatter(md_data["x"][mask], md_data["T"][mask],
+                                   s=18, color="tab:green", marker="o",
+                                   zorder=5, label="MD", alpha=0.85)
+                if dg_data is not None:
+                    mask = np.abs(dg_data["x_rel"]) <= HALF_UM
+                    if mask.any():
+                        ax.plot(dg_data["x_rel"][mask], dg_data["T"][mask],
+                                color="tab:brown", ls="-", lw=1.5,
+                                zorder=4, label="DG p=2", alpha=0.85)
+
+            ax.set_xlabel("x − x_shock  [µm]", fontsize=9)
             ax.set_ylabel(ylabel,    fontsize=9)
+            ax.set_xlim(-HALF_UM, HALF_UM)
             ax.ticklabel_format(style="sci", axis="y", scilimits=(-2, 4))
             ax.grid(True, alpha=0.2, linestyle=":")
             ax.tick_params(labelsize=8)
-            if plotted and row == 0:
+            ax.axvline(0, color="k", lw=0.6, ls=":", alpha=0.4)
+            if plotted and (row == 0 or col_key == "T"):
                 ax.legend(fontsize=7.5, loc="upper right")
 
     if args.save:

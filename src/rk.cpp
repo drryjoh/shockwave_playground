@@ -65,4 +65,46 @@ void ssprk3_step(
     refresh(s, m, gas, bc_left, bc_right, decomp);
 }
 
+void godunov_split_step(
+    State&                s,
+    const Mesh&           m,
+    const GasModel&       gas,
+    const TransportModel& tm,
+    const SolverConfig&   cfg,
+    const BCState&        bc_left,
+    const BCState&        bc_right,
+    const MPIDecomp&      decomp,
+    double                dt)
+{
+    const int ib = m.interior_begin();
+    const int ie = m.interior_end();
+
+    State    s1(m.n_total), s2(m.n_total);
+    Residual R(m.n_total);
+
+    // ── Sub-step 1: SSPRK3 with inviscid-only residual (flatten applied) ──────
+    compute_residual(s, m, gas, tm, cfg, R, ResidualPart::InviscidOnly);
+    rk_combine(s1, s, s, R, 0.0, 1.0, dt, ib, ie);
+    refresh(s1, m, gas, bc_left, bc_right, decomp);
+
+    compute_residual(s1, m, gas, tm, cfg, R, ResidualPart::InviscidOnly);
+    rk_combine(s2, s, s1, R, 0.75, 0.25, dt, ib, ie);
+    refresh(s2, m, gas, bc_left, bc_right, decomp);
+
+    compute_residual(s2, m, gas, tm, cfg, R, ResidualPart::InviscidOnly);
+    rk_combine(s, s, s2, R, 1.0 / 3.0, 2.0 / 3.0, dt, ib, ie);
+    refresh(s, m, gas, bc_left, bc_right, decomp);
+
+    // ── Sub-step 2: explicit Euler with viscous-only residual ─────────────────
+    if (cfg.viscous_terms) {
+        compute_residual(s, m, gas, tm, cfg, R, ResidualPart::ViscousOnly);
+        for (int i = ib; i < ie; ++i) {
+            s.rho[i]  += dt * R.r_rho[i];
+            s.rhou[i] += dt * R.r_rhou[i];
+            s.rhoE[i] += dt * R.r_rhoE[i];
+        }
+        refresh(s, m, gas, bc_left, bc_right, decomp);
+    }
+}
+
 } // namespace splay

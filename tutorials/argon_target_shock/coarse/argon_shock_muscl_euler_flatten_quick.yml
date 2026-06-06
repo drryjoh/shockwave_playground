@@ -1,4 +1,4 @@
-# MUSCL Euler + CW84 flattening, N=200, quick test.
+# MUSCL Euler + CW84 flattening, N=500, quick test.
 # Compare with argon_shock_muscl_euler_quick.yml (no flatten).
 # MUSCL flattening applies the same pressure-ratio shock sensor as PPM,
 # blending the piecewise-linear face states toward cell averages near shocks.
@@ -18,7 +18,7 @@ domain.right:
 grid:
   units: cm
   L: 7.600403652e-4
-  n: 200
+  n: 500
   ghost_cells: 3
 
 initialization:

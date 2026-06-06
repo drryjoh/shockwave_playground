@@ -122,8 +122,12 @@ int main(int argc, char** argv) {
             if (dt <= 0.0) break;
 
             // RK advance.
-            splay::ssprk3_step(s, m, gas, tm, cfg.solver,
-                                cfg.bc_left, cfg.bc_right, decomp, dt);
+            if (cfg.solver.operator_splitting)
+                splay::godunov_split_step(s, m, gas, tm, cfg.solver,
+                                          cfg.bc_left, cfg.bc_right, decomp, dt);
+            else
+                splay::ssprk3_step(s, m, gas, tm, cfg.solver,
+                                   cfg.bc_left, cfg.bc_right, decomp, dt);
 
             time += dt;
             ++step;

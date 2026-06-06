@@ -21,6 +21,13 @@ struct Residual {
     void zero();
 };
 
+/// Selects which flux contributions to include in compute_residual().
+enum class ResidualPart {
+    Full,         ///< inviscid + viscous  (normal operation)
+    InviscidOnly, ///< inviscid fluxes only (used by Godunov splitting, inviscid sub-step)
+    ViscousOnly,  ///< viscous  fluxes only (used by Godunov splitting, viscous  sub-step)
+};
+
 /// Compute R(U): the right-hand side of dU/dt = R(U).
 ///
 /// Steps:
@@ -36,7 +43,8 @@ void compute_residual(
     const GasModel&       gas,
     const TransportModel& tm,
     const SolverConfig&   cfg,
-    Residual&             R);
+    Residual&             R,
+    ResidualPart          part = ResidualPart::Full);
 
 /// Compute stable time-step satisfying CFL (convective + diffusive when viscous).
 /// Returns global min dt across all local cells.

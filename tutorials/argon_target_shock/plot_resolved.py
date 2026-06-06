@@ -30,11 +30,12 @@ DEFAULT_OUTPUT = os.path.join(REPO_ROOT, "output")
 # (case_name, label, color, linestyle, linewidth)
 # Central NS is first (black solid) as reference.
 CASES = [
-    ("argon_shock_central_navier_stokes",         "Central NS",             "k",          "-",  2.5),
-    ("argon_shock_ppm_navier_stokes",             "PPM NS",                 "tab:orange", "-",  1.8),
-    ("argon_shock_ppm_navier_stokes_flatten",     "PPM NS + flatten",       "tab:red",    "--", 1.8),
-    ("argon_shock_muscl_navier_stokes",           "MUSCL NS",               "tab:blue",   "-",  1.8),
-    ("argon_shock_muscl_navier_stokes_flatten",   "MUSCL NS + flatten",     "tab:cyan",   "--", 1.8),
+    ("argon_shock_central_navier_stokes",               "Central NS",                  "k",          "-",  2.5),
+    ("argon_shock_ppm_navier_stokes",                   "PPM NS",                      "tab:orange", "-",  1.8),
+    ("argon_shock_ppm_navier_stokes_flatten",           "PPM NS + flatten",            "tab:red",    "--", 1.8),
+    ("argon_shock_ppm_navier_stokes_flatten_split",     "PPM NS + flatten + split",    "tab:purple", ":",  2.0),
+    ("argon_shock_muscl_navier_stokes",                 "MUSCL NS",                    "tab:blue",   "-",  1.8),
+    ("argon_shock_muscl_navier_stokes_flatten",         "MUSCL NS + flatten",          "tab:cyan",   "--", 1.8),
 ]
 
 VARS = [
@@ -43,7 +44,7 @@ VARS = [
     ("T",   "Temperature  [K]"),
 ]
 
-T_SHOCK_MID = 1000.0   # K — temperature level used to locate shock centre
+T_SHOCK_MID = 1500.0   # K — temperature level used to locate shock centre
 
 
 # ── I/O helpers ───────────────────────────────────────────────────────────────
@@ -103,15 +104,29 @@ def main():
         print("  bash tutorials/argon_target_shock/fine/run.sh --no-plot")
         sys.exit(1)
 
-    # Load MD data (x in metres, T in K) — temperature only
+    # Load MD data — x already in µm, shock-centred; col 1 = T [K]
     md_path = os.path.join(SCRIPT_DIR, "MD_data.txt")
     md_data = None
     if os.path.exists(md_path):
-        md_arr = np.loadtxt(md_path)
-        md_data = {"x": md_arr[:, 0], "T": md_arr[:, 1]}
+        md_arr = np.loadtxt(md_path, delimiter=",")
+        md_data = {"x": md_arr[:, 0], "T": md_arr[:, 1]}  # x in µm, already centred
         print(f"  MD data: {len(md_arr)} points loaded from {md_path}")
     else:
         print(f"  [skip] MD data not found at {md_path}")
+
+    # Load DG (p=2) data — x in metres, needs shock-centering
+    dg_dir = os.path.join(SCRIPT_DIR, "DG")
+    dg_data = None
+    dg_x_files = sorted(glob.glob(os.path.join(dg_dir, "x_*.npy")))
+    dg_T_files = sorted(glob.glob(os.path.join(dg_dir, "Temperature_*.npy")))
+    if dg_x_files and dg_T_files:
+        dg_x = np.load(dg_x_files[-1])
+        dg_T = np.load(dg_T_files[-1])
+        dg_xc = dg_x[np.argmin(np.abs(dg_T - T_SHOCK_MID))]
+        dg_data = {"x_rel": (dg_x - dg_xc) * 1e6, "T": dg_T}  # x_rel in µm, centred
+        print(f"  DG data: {len(dg_x)} points loaded, shock@{dg_xc*1e6:.3f} µm")
+    else:
+        print(f"  [skip] DG data not found in {dg_dir}")
 
     n_vars = len(VARS)
     fig, axes = plt.subplots(1, n_vars, figsize=(5.0 * n_vars, 5.0))
@@ -137,15 +152,22 @@ def main():
             ax.plot(x_r[mask], d[col_key][mask],
                     color=color, ls=ls, lw=lw, label=label, alpha=0.9)
 
-        # Overlay MD temperature data on the T panel only
-        if col_key == "T" and md_data is not None:
-            x_c = shock_centre(next(iter(datasets.values())))
-            x_md_rel = (md_data["x"] - x_c) * 1e6
-            mask = np.abs(x_md_rel) <= half_um
-            if mask.any():
-                ax.scatter(x_md_rel[mask], md_data["T"][mask],
-                           s=8, color="tab:green", marker="o",
-                           zorder=5, label="MD", alpha=0.8)
+        # Overlay reference data on the T panel only
+        if col_key == "T":
+            # MD data — x already in µm, shock-centred
+            if md_data is not None:
+                mask = np.abs(md_data["x"]) <= half_um
+                if mask.any():
+                    ax.scatter(md_data["x"][mask], md_data["T"][mask],
+                               s=18, color="tab:green", marker="o",
+                               zorder=5, label="MD", alpha=0.85)
+            # DG (p=2) data — x in µm, shock-centred via T_SHOCK_MID
+            if dg_data is not None:
+                mask = np.abs(dg_data["x_rel"]) <= half_um
+                if mask.any():
+                    ax.plot(dg_data["x_rel"][mask], dg_data["T"][mask],
+                            color="tab:brown", ls="-", lw=1.5,
+                            zorder=4, label="DG p=2", alpha=0.85)
 
         ax.set_xlabel("x − x_shock  [µm]", fontsize=10)
         ax.set_ylabel(ylabel, fontsize=10)
@@ -155,9 +177,8 @@ def main():
         ax.tick_params(labelsize=9)
         ax.axvline(0, color="k", lw=0.6, ls=":", alpha=0.4)  # mark shock centre
 
-    # Legend on T panel (last axis) to include MD entry; rho panel gets scheme legend
-    axes[0].legend(fontsize=9, loc="upper left")
-    axes[-1].legend(fontsize=9, loc="upper left")
+    for ax in axes:
+        ax.legend(fontsize=9, loc="upper right")
 
     plt.tight_layout()
 

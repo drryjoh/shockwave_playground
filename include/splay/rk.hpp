@@ -28,4 +28,22 @@ void ssprk3_step(
     const MPIDecomp&      decomp,
     double                dt);
 
+/// Advance one time step using Godunov operator splitting:
+///   1. SSPRK3 with inviscid-only residual (flattening applied here).
+///   2. Explicit Euler with viscous-only residual.
+///
+/// This decouples the inviscid (flatten) and viscous operators so that
+/// flattening captures the shock before the viscous step sees the profile.
+/// Useful for reproducing the PeleC-like non-convergence behaviour.
+void godunov_split_step(
+    State&                s,
+    const Mesh&           m,
+    const GasModel&       gas,
+    const TransportModel& tm,
+    const SolverConfig&   cfg,
+    const BCState&        bc_left,
+    const BCState&        bc_right,
+    const MPIDecomp&      decomp,
+    double                dt);
+
 } // namespace splay

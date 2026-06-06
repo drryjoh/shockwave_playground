@@ -31,6 +31,7 @@ CASES=(
     argon_shock_muscl_navier_stokes
     argon_shock_ppm_navier_stokes_flatten
     argon_shock_muscl_navier_stokes_flatten
+    argon_shock_ppm_navier_stokes_flatten_split
 )
 
 for case in "${CASES[@]}"; do

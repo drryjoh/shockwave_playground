@@ -139,6 +139,8 @@ Config load_config(const std::string& yaml_path, const std::string& restart_path
         if (cfg.solver.flatten_z1 >= cfg.solver.flatten_z2)
             throw std::runtime_error("solver.flatten_z1 must be < flatten_z2.");
 
+        cfg.solver.operator_splitting = optional<bool>(solver_node, "splitting", false);
+
         if (cfg.solver.cfl <= 0.0 || cfg.solver.cfl > 1.0)
             throw std::runtime_error("solver.cfl must be in (0, 1].");
         if (cfg.solver.time_end <= 0.0)

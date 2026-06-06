@@ -1,9 +1,9 @@
-# PPM Navier-Stokes, N=200, quick test (no flattening).
+# PPM Navier-Stokes, N=500, quick test (no flattening).
 # Baseline for comparison with the flatten case below.
 # Without flattening, PPM+NS allows physical viscous dissipation to set the
 # shock thickness — the resolved structure differs from PeleC's behaviour.
 # viscous_dt: false uses only the convective CFL; the parabolic constraint
-# is not enforced (acceptable at N=200 where viscous effects are underresolved).
+# is not enforced (acceptable at N=500 where viscous effects are underresolved).
 case_name: argon_shock_ppm_ns_quick
 
 gas: argon
@@ -20,7 +20,7 @@ domain.right:
 grid:
   units: cm
   L: 7.600403652e-4
-  n: 200
+  n: 500
   ghost_cells: 3
 
 initialization:
@@ -42,7 +42,7 @@ solver:
   time_end: 2.3352e-09
   rk: 3
   viscous_terms: true
-  viscous_dt: false        # convective CFL only; parabolic dt is ~2e-10 s at N=200
+  viscous_dt: false        # convective CFL only; parabolic dt is ~2e-10 s at N=500
   inviscid_scheme: ppm
   riemann_solver: hllc
   limiter: ppm

@@ -21,7 +21,7 @@ initialization:
   type: tanh
   units: SI
   location: 3.0e-6
-  thickness: 5.0e-8
+  thickness: 5.0e-9
   left:
     pressure: 1.56880625e7
     temperature: 2632.24759509
