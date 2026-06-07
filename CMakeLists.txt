@@ -66,6 +66,9 @@ set(SPLAY_SRCS
     src/mpi_decomp.cpp
     src/io.cpp
     src/diagnostics.cpp
+    src/dg_state.cpp
+    src/dg_av.cpp
+    src/dg_residual.cpp
 )
 
 add_library(splay_core STATIC ${SPLAY_SRCS})
@@ -113,6 +116,7 @@ if(SPLAY_BUILD_TESTS)
         tests/test_mpi_decomp.cpp
         tests/test_restart.cpp
         tests/test_sod.cpp
+        tests/test_dg.cpp
     )
 
     foreach(test_src ${TEST_SRCS})

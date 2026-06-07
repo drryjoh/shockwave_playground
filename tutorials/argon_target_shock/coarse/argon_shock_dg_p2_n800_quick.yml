@@ -1,0 +1,56 @@
+# DG p=2, N=800.  Navier-Stokes with BR2 viscous scheme, no artificial viscosity.
+# Physical viscosity stabilises the shock — AV would double-count diffusion.
+# Effective resolution: 800 cells × 3 GLL nodes = 2400 DOFs  (vs 800 for FVM).
+# CFL is specified in FVM terms; compute_dt_dg applies the 1/(2p+1)=1/5 factor internally.
+case_name: argon_shock_dg_p2_n800_quick
+
+gas: argon
+
+domain.left:
+  type: inflow
+  pressure: 1.56880625e7
+  temperature: 2632.24759509
+  velocity: 1168.9
+
+domain.right:
+  type: outflow
+
+grid:
+  units: cm
+  L: 7.600403652e-4
+  n: 800
+  ghost_cells: 2
+
+initialization:
+  type: tanh
+  units: SI
+  location: 3.0e-6
+  thickness: 5.0e-8
+  left:
+    pressure: 1.56880625e7
+    temperature: 2632.24759509
+    velocity: 1168.9
+  right:
+    pressure: 5.0e5
+    temperature: 300.0
+    velocity: 0.0
+
+solver:
+  spatial: dg
+  cfl: 0.2
+  time_end: 2.3352e-09
+  rk: 3
+  viscous_terms: true
+  riemann_solver: hllc
+  dg:
+    poly_order: 2
+    av_method: none
+    C_av: 0.5
+    s0: -4.0
+    kappa: 1.0
+    visc_scheme: br2
+
+diagnostics:
+  log.step: 800
+  snapshot.step: 800
+  units: SI

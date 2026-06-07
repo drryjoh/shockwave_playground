@@ -3,6 +3,30 @@
 
 namespace splay {
 
+// ─── Spatial discretization ───────────────────────────────────────────────────
+enum class SpatialDiscretization { FVM, DG };
+
+// ─── DG viscous scheme ────────────────────────────────────────────────────────
+// SIPG: symmetric interior penalty — penalty = η/h on jump [U].
+// BR2:  second Bassi-Rebay — penalty via local lifting: β/h where β = 1/w_endpoint.
+enum class ViscousScheme { SIPG, BR2 };
+
+// ─── DG artificial viscosity method ─────────────────────────────────────────
+enum class AVMethod { None, PerssonPeraire, ResidualBased };
+
+// ─── DG configuration ─────────────────────────────────────────────────────────
+struct DGConfig {
+    int          poly_order    = 2;      ///< polynomial order p (1 or 2)
+    ViscousScheme visc_scheme  = ViscousScheme::BR2;
+    double       sipg_penalty  = 10.0;  ///< η for SIPG (ignored for BR2)
+    AVMethod     av_method     = AVMethod::PerssonPeraire;
+    double       C_av          = 0.5;   ///< AV magnitude scale factor
+    // Persson-Peraire sensor thresholds.
+    // s0 < 0 triggers auto-selection: s0 = -p*p (scales with order).
+    double       s0            = -4.0;  ///< log10 threshold (smooth ↔ shocked)
+    double       kappa         = 1.0;   ///< sigmoid half-width in log10 space
+};
+
 // ─── Inviscid scheme ──────────────────────────────────────────────────────────
 enum class InviscidScheme { Central, MUSCL, PPM, PPM_Pele };
 
@@ -54,6 +78,9 @@ struct GridConfig {
 
 // ─── Solver ───────────────────────────────────────────────────────────────────
 struct SolverConfig {
+    SpatialDiscretization spatial  = SpatialDiscretization::FVM;
+    DGConfig              dg;      ///< only used when spatial == DG
+
     double         cfl              = 0.5;
     double         time_end         = 1.0;
     int            rk_order         = 3;

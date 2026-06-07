@@ -23,7 +23,7 @@ void test_argon_properties() {
     check(near(g.gamma, 5.0/3.0, 1e-12), "argon gamma");
     check(near(g.MW, 0.039948, 1e-8),    "argon MW");
     // R = Ru / MW
-    check(near(g.R, 8314.46261815324 / 0.039948, 1e-6), "argon R");
+    check(near(g.R, 8.31446261815324 / 0.039948, 1e-6), "argon R");
     // gamma = cp/cv => cv = R/(gamma-1)
     check(near(g.cv, g.R / (g.gamma - 1.0), 1e-10), "argon cv");
     check(near(g.cp, g.gamma * g.cv, 1e-10),         "argon cp");

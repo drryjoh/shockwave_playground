@@ -1,4 +1,5 @@
 #include "splay/io.hpp"
+#include "splay/dg_state.hpp"
 #include <fstream>
 #include <sstream>
 #include <iomanip>
@@ -77,6 +78,80 @@ void write_csv(const State&          s,
         std::string combined = rank_dir + "/step_" + step_str(step) + "_combined.csv";
         std::ofstream comb(combined);
         if (!comb) throw std::runtime_error("Cannot open combined file: " + combined);
+        comb << "# time=" << time << " step=" << step << " nranks=" << decomp.nranks << "\n";
+        comb << "x,rho,u,p,T,Mach,mu,kappa\n";
+        for (int r = 0; r < decomp.nranks; ++r) {
+            std::string rfile = rank_dir + "/step_" + step_str(step)
+                              + "_rank" + std::to_string(r) + ".csv";
+            std::ifstream rf(rfile);
+            if (!rf) continue;
+            std::string line;
+            std::getline(rf, line);  // skip time comment
+            std::getline(rf, line);  // skip header
+            while (std::getline(rf, line)) comb << line << "\n";
+        }
+    }
+}
+
+// ─── DG DOF CSV snapshot ──────────────────────────────────────────────────────
+void write_csv_dg(const DGState&        dgs,
+                  const Mesh&           m,
+                  const TransportModel& tm,
+                  const GasModel&       gas,
+                  const MPIDecomp&      decomp,
+                  const std::string&    output_dir,
+                  const std::string&    case_name,
+                  int                   step,
+                  double                time)
+{
+    const int ib      = m.interior_begin();
+    const int ie      = m.interior_end();
+    const int ndof    = dgs.n_dof;
+    const double half_dx = 0.5 * m.dx;
+
+    std::string rank_dir = output_dir + "/" + case_name + "/snapshots";
+    ensure_dir(rank_dir);
+
+    std::string filename = rank_dir + "/step_" + step_str(step)
+                         + "_rank" + std::to_string(decomp.rank) + ".csv";
+
+    std::ofstream out(filename);
+    if (!out) throw std::runtime_error("Cannot open DG output file: " + filename);
+
+    out << std::scientific << std::setprecision(10);
+    out << "# time=" << time << " step=" << step << "\n";
+    out << "x,rho,u,p,T,Mach,mu,kappa\n";
+
+    for (int i = ib; i < ie; ++i) {
+        for (int j = 0; j < ndof; ++j) {
+            const double x    = m.x_cell[i] + dgs.basis.xi[j] * half_dx;
+            const double rho  = dgs.rho   [j][i];
+            const double u    = dgs.u      [j][i];
+            const double p    = dgs.prim_p [j][i];
+            const double T    = dgs.T      [j][i];
+            const double a    = gas.sound_speed(p, rho);
+            const double Mach = u / a;
+            const double mu_v = tm.viscosity(T);
+            const double k_v  = tm.conductivity(T);
+            out << x    << ","
+                << rho  << ","
+                << u    << ","
+                << p    << ","
+                << T    << ","
+                << Mach << ","
+                << mu_v << ","
+                << k_v  << "\n";
+        }
+    }
+    out.close();
+
+#ifdef SPLAY_ENABLE_MPI
+    MPI_Barrier(MPI_COMM_WORLD);
+#endif
+    if (decomp.rank == 0) {
+        std::string combined = rank_dir + "/step_" + step_str(step) + "_combined.csv";
+        std::ofstream comb(combined);
+        if (!comb) throw std::runtime_error("Cannot open combined DG file: " + combined);
         comb << "# time=" << time << " step=" << step << " nranks=" << decomp.nranks << "\n";
         comb << "x,rho,u,p,T,Mach,mu,kappa\n";
         for (int r = 0; r < decomp.nranks; ++r) {

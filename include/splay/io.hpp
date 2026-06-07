@@ -5,6 +5,7 @@
 #include "splay/config.hpp"
 #include "splay/transport.hpp"
 #include "splay/mpi_decomp.hpp"
+#include "splay/dg_state.hpp"
 
 namespace splay {
 
@@ -21,6 +22,20 @@ void write_csv(const State&          s,
                const std::string&    case_name,
                int                   step,
                double                time);
+
+/// Write a DG CSV snapshot with all GLL DOFs as individual rows.
+/// For p=2 with N cells this produces N*(p+1) rows, preserving sub-cell structure.
+/// Each row: x_dof, rho, u, p, T, Mach, mu, kappa
+/// Adjacent cells share face x positions but may have different values (DG jump).
+void write_csv_dg(const DGState&        dgs,
+                  const Mesh&           m,
+                  const TransportModel& tm,
+                  const GasModel&       gas,
+                  const MPIDecomp&      decomp,
+                  const std::string&    output_dir,
+                  const std::string&    case_name,
+                  int                   step,
+                  double                time);
 
 /// Write a restart file (one per rank).
 /// Format: YAML metadata + CSV data.

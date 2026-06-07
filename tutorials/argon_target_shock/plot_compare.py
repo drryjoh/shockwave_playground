@@ -22,11 +22,14 @@ import matplotlib.cm as cm
 OUTPUT_DIR = sys.argv[1] if len(sys.argv) > 1 else "output"
 
 CASES = [
-    ("argon_shock_central_navier_stokes", "Central NS",       "k",   "-",   2.5),
-    ("argon_shock_muscl_euler",           "MUSCL Euler",      "tab:blue",  "--", 1.5),
-    ("argon_shock_ppm_euler",             "PPM Euler",        "tab:orange","--", 1.5),
-    ("argon_shock_muscl_navier_stokes",   "MUSCL NS",         "tab:green", ":",  1.5),
-    ("argon_shock_ppm_navier_stokes",     "PPM NS",           "tab:red",   ":",  1.5),
+    ("argon_shock_central_navier_stokes",  "Central NS",          "k",            "-",   2.5),
+    ("argon_shock_muscl_euler",            "MUSCL Euler n=500",   "tab:blue",     "--",  1.5),
+    ("argon_shock_ppm_euler",              "PPM Euler n=500",     "tab:orange",   "--",  1.5),
+    ("argon_shock_muscl_navier_stokes",    "MUSCL NS n=500",      "tab:green",    ":",   1.5),
+    ("argon_shock_ppm_navier_stokes",      "PPM NS n=500",        "tab:red",      ":",   1.5),
+    # DG p=2 cases: run with argon_shock_dg_p2_n{500,1000}_quick.yml
+    ("argon_shock_dg_p2_n500_quick",       "DG p=2 n=500",        "tab:purple",   "-",   2.0),
+    ("argon_shock_dg_p2_n1000_quick",      "DG p=2 n=1000",       "darkviolet",   "-",   2.0),
 ]
 
 VARS = ["rho", "u", "p", "T", "Mach", "mu"]

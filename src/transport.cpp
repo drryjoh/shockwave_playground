@@ -13,31 +13,15 @@ double TransportModel::poly4(const std::array<double, 5>& c, double T) {
 }
 
 double TransportModel::viscosity(double T) const {
-    if (T < T_min * 0.95 || T > T_max * 1.05) {
-        std::cerr << "[SPLAY] Warning: T=" << T << " K is outside transport fit range ["
-                  << T_min << ", " << T_max << "] for " << name << "\n";
-    }
-    const double val = poly4(mu_coeff, T);
-    if (val <= 0.0) {
-        std::cerr << "[SPLAY] Warning: viscosity evaluated to " << val
-                  << " Pa·s at T=" << T << " K; clamping to zero.\n";
-        return 0.0;
-    }
-    return val;
+    // Floor T at T_min so Gibbs-oscillation nodes still get physical viscosity.
+    // Clamping the result to zero instead removes stabilisation exactly where needed.
+    const double Tc = std::max(T, T_min);
+    return poly4(mu_coeff, Tc);
 }
 
 double TransportModel::conductivity(double T) const {
-    if (T < T_min * 0.95 || T > T_max * 1.05) {
-        std::cerr << "[SPLAY] Warning: T=" << T << " K is outside transport fit range ["
-                  << T_min << ", " << T_max << "] for " << name << "\n";
-    }
-    const double val = poly4(k_coeff, T);
-    if (val <= 0.0) {
-        std::cerr << "[SPLAY] Warning: conductivity evaluated to " << val
-                  << " W/(m·K) at T=" << T << " K; clamping to zero.\n";
-        return 0.0;
-    }
-    return val;
+    const double Tc = std::max(T, T_min);
+    return poly4(k_coeff, Tc);
 }
 
 TransportModel TransportModel::from_name(const std::string& gas_name) {

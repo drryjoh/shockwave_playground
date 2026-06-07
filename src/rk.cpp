@@ -1,6 +1,8 @@
 #include "splay/rk.hpp"
 #include "splay/residual.hpp"
 #include "splay/mpi_decomp.hpp"
+#include "splay/dg_av.hpp"
+#include "splay/dg_residual.hpp"
 
 namespace splay {
 
@@ -105,6 +107,77 @@ void godunov_split_step(
         }
         refresh(s, m, gas, bc_left, bc_right, decomp);
     }
+}
+
+// ─── DG SSPRK3 ───────────────────────────────────────────────────────────────
+
+/// U_out[j][i] = alpha*a[j][i] + beta*(b[j][i] + dt*R[j][i]) for i in [ib,ie)
+static void dg_rk_combine(
+    DGState& out, const DGState& a, const DGState& b, const DGResidual& Rb,
+    double alpha, double beta, double dt,
+    int ib, int ie)
+{
+    const int nd = out.n_dof;
+    for (int i = ib; i < ie; ++i) {
+        for (int j = 0; j < nd; ++j) {
+            out.rho [j][i] = alpha * a.rho [j][i] + beta * (b.rho [j][i] + dt * Rb.r_rho [j][i]);
+            out.rhou[j][i] = alpha * a.rhou[j][i] + beta * (b.rhou[j][i] + dt * Rb.r_rhou[j][i]);
+            out.rhoE[j][i] = alpha * a.rhoE[j][i] + beta * (b.rhoE[j][i] + dt * Rb.r_rhoE[j][i]);
+        }
+    }
+}
+
+/// Update primitives, apply BCs, exchange MPI ghosts, re-update ghost primitives.
+static void dg_refresh(DGState& s, const Mesh& m, const GasModel& gas,
+                       const BCState& bc_left, const BCState& bc_right,
+                       const MPIDecomp& decomp)
+{
+    s.update_primitives(m.interior_begin(), m.interior_end(), gas);
+    // apply_boundary_conditions_dg fills ghost DOFs and calls update_primitives
+    // over the full domain, so ghost primitives are set for the physical BC case.
+    apply_boundary_conditions_dg(s, m, bc_left, bc_right, gas);
+    // MPI exchange overwrites ghost DOFs for interior-to-interior boundaries.
+    fill_ghosts_dg(s, m, decomp.rank, decomp.nranks,
+                   decomp.left_neighbor, decomp.right_neighbor);
+    // Re-derive primitives for MPI-filled ghost cells (no-op for nranks==1).
+    s.update_primitives(0, m.interior_begin(), gas);
+    s.update_primitives(m.interior_end(), m.n_total, gas);
+}
+
+void ssprk3_step_dg(
+    DGState&              s,
+    const Mesh&           m,
+    const GasModel&       gas,
+    const TransportModel& tm,
+    const SolverConfig&   cfg,
+    const BCState&        bc_left,
+    const BCState&        bc_right,
+    const MPIDecomp&      decomp,
+    double                dt)
+{
+    const int ib = m.interior_begin();
+    const int ie = m.interior_end();
+
+    DGState    s1(m.n_total, s.p), s2(m.n_total, s.p);
+    DGResidual R(m.n_total, s.n_dof);
+
+    // ─── Stage 1: U^(1) = U^n + dt * R(U^n) ─────────────────────────────────
+    compute_av_dg(s, m, gas, cfg.dg);
+    compute_residual_dg(s, m, gas, tm, cfg, R);
+    dg_rk_combine(s1, s, s, R, 0.0, 1.0, dt, ib, ie);
+    dg_refresh(s1, m, gas, bc_left, bc_right, decomp);
+
+    // ─── Stage 2: U^(2) = (3/4)U^n + (1/4)(U^(1) + dt*R(U^(1))) ─────────────
+    compute_av_dg(s1, m, gas, cfg.dg);
+    compute_residual_dg(s1, m, gas, tm, cfg, R);
+    dg_rk_combine(s2, s, s1, R, 0.75, 0.25, dt, ib, ie);
+    dg_refresh(s2, m, gas, bc_left, bc_right, decomp);
+
+    // ─── Stage 3: U^{n+1} = (1/3)U^n + (2/3)(U^(2) + dt*R(U^(2))) ───────────
+    compute_av_dg(s2, m, gas, cfg.dg);
+    compute_residual_dg(s2, m, gas, tm, cfg, R);
+    dg_rk_combine(s, s, s2, R, 1.0 / 3.0, 2.0 / 3.0, dt, ib, ie);
+    dg_refresh(s, m, gas, bc_left, bc_right, decomp);
 }
 
 } // namespace splay

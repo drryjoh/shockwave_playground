@@ -40,6 +40,25 @@ static Limiter parse_limiter(const std::string& s) {
     throw std::runtime_error("Unknown limiter: " + s);
 }
 
+static SpatialDiscretization parse_spatial(const std::string& s) {
+    if (s == "fvm") return SpatialDiscretization::FVM;
+    if (s == "dg")  return SpatialDiscretization::DG;
+    throw std::runtime_error("Unknown spatial discretization: " + s + " (expected fvm or dg)");
+}
+
+static ViscousScheme parse_visc_scheme(const std::string& s) {
+    if (s == "sipg") return ViscousScheme::SIPG;
+    if (s == "br2")  return ViscousScheme::BR2;
+    throw std::runtime_error("Unknown dg.visc_scheme: " + s + " (expected sipg or br2)");
+}
+
+static AVMethod parse_av_method(const std::string& s) {
+    if (s == "none"             ) return AVMethod::None;
+    if (s == "persson_peraire"  ) return AVMethod::PerssonPeraire;
+    if (s == "residual_based"   ) return AVMethod::ResidualBased;
+    throw std::runtime_error("Unknown dg.av_method: " + s);
+}
+
 static BCType parse_bc_type(const std::string& s) {
     if (s == "inflow")  return BCType::Inflow;
     if (s == "outflow") return BCType::Outflow;
@@ -141,6 +160,27 @@ Config load_config(const std::string& yaml_path, const std::string& restart_path
             throw std::runtime_error("solver.flatten_z1 must be < flatten_z2.");
 
         cfg.solver.operator_splitting = optional<bool>(solver_node, "splitting", false);
+
+        // ── DG options ────────────────────────────────────────────────────────
+        std::string spatial_str = optional<std::string>(solver_node, "spatial", "fvm");
+        cfg.solver.spatial = parse_spatial(spatial_str);
+
+        if (cfg.solver.spatial == SpatialDiscretization::DG) {
+            auto dg_node = solver_node["dg"];
+            if (dg_node) {
+                cfg.solver.dg.poly_order   = optional<int>(dg_node, "poly_order",   2);
+                std::string vs = optional<std::string>(dg_node, "visc_scheme", "br2");
+                cfg.solver.dg.visc_scheme  = parse_visc_scheme(vs);
+                cfg.solver.dg.sipg_penalty = optional<double>(dg_node, "sipg_penalty", 10.0);
+                std::string avm = optional<std::string>(dg_node, "av_method", "persson_peraire");
+                cfg.solver.dg.av_method    = parse_av_method(avm);
+                cfg.solver.dg.C_av         = optional<double>(dg_node, "C_av",  0.5);
+                cfg.solver.dg.s0           = optional<double>(dg_node, "s0",   -4.0);
+                cfg.solver.dg.kappa        = optional<double>(dg_node, "kappa", 1.0);
+            }
+            if (cfg.solver.dg.poly_order < 1 || cfg.solver.dg.poly_order > 2)
+                throw std::runtime_error("solver.dg.poly_order must be 1 or 2.");
+        }
 
         if (cfg.solver.cfl <= 0.0 || cfg.solver.cfl > 1.0)
             throw std::runtime_error("solver.cfl must be in (0, 1].");

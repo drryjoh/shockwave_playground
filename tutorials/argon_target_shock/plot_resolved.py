@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 """
-SPLAY – Resolved shock structure plot.
+SPLAY – Resolved shock structure: SPLAY DG vs MD vs reference DG.
 
-Compares PPM+NS (resolved viscous structure), PPM+NS+flatten (PeleC-like
-captured shock), Central+NS, and MUSCL+NS — all from the fine (N=2000) cases.
+Panels: density, pressure, temperature — all shock-centred at T = T_SHOCK_MID.
 
-The x-axis is centred at the shock interface (argmin |T - 1000 K|) so profiles
-from different runs can be meaningfully overlaid even if the shock has drifted
-slightly.  Window: ±0.20 µm.
+Layers (back to front):
+  1. FVM reference cases  (thin, muted)  — for context only
+  2. SPLAY DG p=2 n=500 and n=1000      — primary comparison
+  3. Reference DG .npy (T only)         — existing DG reference on T panel
+  4. MD scatter (T only)                — ground truth on T panel
 
 Usage (from repo root):
     python tutorials/argon_target_shock/plot_resolved.py
-    python tutorials/argon_target_shock/plot_resolved.py --save resolved.png
-    python tutorials/argon_target_shock/plot_resolved.py --window 0.5
+    python tutorials/argon_target_shock/plot_resolved.py --save resolved_dg.png
+    python tutorials/argon_target_shock/plot_resolved.py --window 0.4
 """
 
 import sys
@@ -27,16 +28,18 @@ SCRIPT_DIR     = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT      = os.path.abspath(os.path.join(SCRIPT_DIR, "..", ".."))
 DEFAULT_OUTPUT = os.path.join(REPO_ROOT, "output")
 
-# (case_name, label, color, linestyle, linewidth)
-# Central NS is first (black solid) as reference.
-CASES = [
-    ("argon_shock_central_navier_stokes",               "Central NS",                  "k",          "-",  2.5),
-    ("argon_shock_ppm_navier_stokes",                   "PPM NS",                      "tab:orange", "-",  1.8),
-    ("argon_shock_ppm_navier_stokes_flatten",           "PPM NS + flatten",            "tab:red",    "--", 1.8),
-    ("argon_shock_ppm_navier_stokes_flatten_split",     "PPM NS + flatten + split",    "tab:purple", ":",  2.0),
-    ("argon_shock_ppm_pele_navier_stokes",              "PPM_pele NS",                 "tab:pink",   "-.", 2.0),
-    ("argon_shock_muscl_navier_stokes",                 "MUSCL NS",                    "tab:blue",   "-",  1.8),
-    ("argon_shock_muscl_navier_stokes_flatten",         "MUSCL NS + flatten",          "tab:cyan",   "--", 1.8),
+# ── FVM reference cases ───────────────────────────────────────────────────────
+# (case_name, label, color, linestyle, linewidth, alpha)
+FVM_CASES = [
+    ("argon_shock_central_navier_stokes",  "Central NS",  "tab:blue",    "-",   1.5, 0.75),
+    ("argon_shock_ppm_navier_stokes",      "PPM NS",      "tab:orange",  "--",  1.5, 0.75),
+    ("argon_shock_muscl_navier_stokes",    "MUSCL NS",    "tab:red",     ":",   1.5, 0.75),
+]
+
+# ── SPLAY DG cases (primary comparison, plotted prominently) ──────────────────
+# (case_name, label, color, linestyle, linewidth, alpha)
+DG_CASES = [
+    ("argon_shock_dg_p2_n800_quick",  "SPLAY DG p=2, n=800",  "tab:purple",  "-",  2.5, 1.0),
 ]
 
 VARS = [
@@ -45,7 +48,7 @@ VARS = [
     ("T",   "Temperature  [K]"),
 ]
 
-T_SHOCK_MID = 1500.0   # K — temperature level used to locate shock centre
+T_SHOCK_MID = 1500.0   # K — fallback threshold (see shock_centre below)
 
 
 # ── I/O helpers ───────────────────────────────────────────────────────────────
@@ -73,115 +76,199 @@ def load_csv(path):
     return {k: v[idx] for k, v in d.items()}
 
 
-def shock_centre(d, T_mid=T_SHOCK_MID):
-    """Return x-coordinate [m] where T is closest to T_mid."""
-    return d["x"][np.argmin(np.abs(d["T"] - T_mid))]
+def shock_centre(d):
+    """
+    Locate shock centre at the x [m] where T = T_SHOCK_MID (1500 K) by linear
+    interpolation between the two bracketing points.  Falls back to max |dρ/dx|
+    if no crossing is found (e.g., fully post-shock data).
+    """
+    x = d["x"]
+    T = d["T"]
+    crossings = np.where((T[:-1] - T_SHOCK_MID) * (T[1:] - T_SHOCK_MID) < 0)[0]
+    if len(crossings):
+        i    = crossings[0]
+        frac = (T_SHOCK_MID - T[i]) / (T[i + 1] - T[i])
+        return x[i] + frac * (x[i + 1] - x[i])
+    # fallback: max |dρ/dx|
+    rho  = d["rho"]
+    drho = np.zeros_like(rho)
+    drho[1:-1] = (rho[2:] - rho[:-2]) / (x[2:] - x[:-2])
+    drho[0]    = (rho[1]  - rho[0])   / (x[1]  - x[0])
+    drho[-1]   = (rho[-1] - rho[-2])  / (x[-1] - x[-2])
+    return x[np.argmax(np.abs(drho))]
+
+
+def rel_x_um(d, half_um):
+    """Return (x_rel [µm], mask) for points within ±half_um of shock centre."""
+    xc    = shock_centre(d)
+    x_rel = (d["x"] - xc) * 1e6
+    return x_rel, np.abs(x_rel) <= half_um
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main():
-    parser = argparse.ArgumentParser(description="SPLAY resolved shock structure plot")
+    parser = argparse.ArgumentParser(
+        description="SPLAY DG vs MD vs reference DG resolved shock comparison")
     parser.add_argument("--output_dir", default=DEFAULT_OUTPUT)
     parser.add_argument("--save",   default="", help="Save to file (png/pdf)")
-    parser.add_argument("--window", type=float, default=0.20,
-                        help="Half-width of x window in µm (default 0.20)")
+    parser.add_argument("--window", type=float, default=0.1,
+                        help="Half-width of x window [µm] (default 0.1)")
     args = parser.parse_args()
 
-    # Load data
-    datasets = {}
-    for case_name, label, *_ in CASES:
+    half_um = args.window
+
+    # ── Load FVM reference data ───────────────────────────────────────────────
+    fvm_datasets = {}
+    for case_name, label, *_ in FVM_CASES:
         csv = find_latest_csv(os.path.join(args.output_dir, case_name))
         if csv is None:
-            print(f"  [skip] {label}: no snapshots in {args.output_dir}/{case_name}")
+            print(f"  [skip-fvm] {label}")
             continue
         d = load_csv(csv)
         if d is not None:
-            datasets[case_name] = d
-            xc_um = shock_centre(d) * 1e6
-            print(f"  {label}: {csv.split('/')[-1]}  shock@{xc_um:.3f} µm")
+            fvm_datasets[case_name] = d
+            print(f"  FVM {label}: {os.path.basename(csv)}"
+                  f"  shock@{shock_centre(d)*1e6:.3f} µm")
 
-    if not datasets:
-        print("\nNo data found. Run the fine cases first:")
-        print("  bash tutorials/argon_target_shock/fine/run.sh --no-plot")
+    # ── Load SPLAY DG data ────────────────────────────────────────────────────
+    dg_splay = {}
+    dg_overshoot = {}   # track rho overshoot as indicator of oscillations
+    for case_name, label, *_ in DG_CASES:
+        csv = find_latest_csv(os.path.join(args.output_dir, case_name))
+        if csv is None:
+            print(f"  [skip-dg] {label}  (run: ./build/splay "
+                  f"tutorials/argon_target_shock/coarse/{case_name.replace('argon_shock_', '')}.yml)")
+            continue
+        d = load_csv(csv)
+        if d is not None:
+            dg_splay[case_name] = d
+            xc = shock_centre(d)
+            # Density overshoot: physical post-shock rho ~ 28.6 kg/m³ for this case
+            rho_max  = d["rho"].max()
+            overshoot = rho_max / 28.6
+            dg_overshoot[case_name] = overshoot
+            flag = f"  *** rho overshoot {overshoot:.2f}×" if overshoot > 1.15 else ""
+            print(f"  {label}: {os.path.basename(csv)}"
+                  f"  shock@{xc*1e6:.3f} µm  rho_max={rho_max:.1f}{flag}")
+
+    if not dg_splay and not fvm_datasets:
+        print("\nNo data found. Run the cases first.")
         sys.exit(1)
 
-    # Load MD data — x already in µm, shock-centred; col 1 = T [K]
-    md_path = os.path.join(SCRIPT_DIR, "MD_data.txt")
+    # ── Load MD reference data (x in µm, already shock-centred) ──────────────
     md_data = None
+    md_path = os.path.join(SCRIPT_DIR, "MD_data.txt")
     if os.path.exists(md_path):
-        md_arr = np.loadtxt(md_path, delimiter=",")
-        md_data = {"x": md_arr[:, 0], "T": md_arr[:, 1]}  # x in µm, already centred
-        print(f"  MD data: {len(md_arr)} points loaded from {md_path}")
+        md_arr  = np.loadtxt(md_path, delimiter=",")
+        md_data = {"x": md_arr[:, 0], "T": md_arr[:, 1]}   # x µm, T K
+        print(f"  MD: {len(md_arr)} points")
     else:
-        print(f"  [skip] MD data not found at {md_path}")
+        print(f"  [skip] MD data not found: {md_path}")
 
-    # Load DG (p=2) data — x in metres, needs shock-centering
-    dg_dir = os.path.join(SCRIPT_DIR, "DG")
-    dg_data = None
-    dg_x_files = sorted(glob.glob(os.path.join(dg_dir, "x_*.npy")))
-    dg_T_files = sorted(glob.glob(os.path.join(dg_dir, "Temperature_*.npy")))
-    if dg_x_files and dg_T_files:
-        dg_x = np.load(dg_x_files[-1])
-        dg_T = np.load(dg_T_files[-1])
-        dg_xc = dg_x[np.argmin(np.abs(dg_T - T_SHOCK_MID))]
-        dg_data = {"x_rel": (dg_x - dg_xc) * 1e6, "T": dg_T}  # x_rel in µm, centred
-        print(f"  DG data: {len(dg_x)} points loaded, shock@{dg_xc*1e6:.3f} µm")
+    # ── Load reference DG .npy (T only, x in metres, not centred) ─────────────
+    ref_dg = None
+    dg_dir  = os.path.join(SCRIPT_DIR, "DG")
+    x_files = sorted(glob.glob(os.path.join(dg_dir, "x_*.npy")))
+    T_files = sorted(glob.glob(os.path.join(dg_dir, "Temperature_*.npy")))
+    if x_files and T_files:
+        rx   = np.load(x_files[-1])
+        rT   = np.load(T_files[-1])
+        # Centre at T = T_SHOCK_MID by interpolation
+        crossings = np.where((rT[:-1] - T_SHOCK_MID) * (rT[1:] - T_SHOCK_MID) < 0)[0]
+        if len(crossings):
+            ci   = crossings[0]
+            frac = (T_SHOCK_MID - rT[ci]) / (rT[ci + 1] - rT[ci])
+            rxc  = rx[ci] + frac * (rx[ci + 1] - rx[ci])
+        else:
+            rxc  = rx[np.argmax(np.abs(np.gradient(rT, rx)))]
+        xrel = (rx - rxc) * 1e6   # µm, centred
+        mask = np.abs(xrel) <= half_um
+        ref_dg = {"x_rel": xrel[mask], "T": rT[mask]}
+        print(f"  Reference DG (.npy): {len(rx)} pts  shock@{rxc*1e6:.3f} µm")
     else:
-        print(f"  [skip] DG data not found in {dg_dir}")
+        print(f"  [skip] Reference DG .npy not found in {dg_dir}")
 
+    # ── Figure layout ─────────────────────────────────────────────────────────
     n_vars = len(VARS)
-    fig, axes = plt.subplots(1, n_vars, figsize=(5.0 * n_vars, 5.0))
-    if n_vars == 1:
-        axes = [axes]
+    fig, axes = plt.subplots(1, n_vars, figsize=(5.2 * n_vars, 5.2),
+                             constrained_layout=True)
 
     fig.suptitle(
-        "SPLAY — Resolved argon shock structure (N=2000, M≈5.03)\n"
-        "x centred at shock interface  (T = 1000 K level)",
+        "Argon shock structure — SPLAY DG p=2 vs FVM vs MD vs reference DG  (M ≈ 5.03)\n"
+        f"x centred at T = {T_SHOCK_MID:.0f} K  |  window ±{half_um:.2f} µm",
         fontsize=12, fontweight="bold"
     )
 
-    half_um = args.window  # µm
-
     for ax, (col_key, ylabel) in zip(axes, VARS):
-        for case_name, label, color, ls, lw in CASES:
-            if case_name not in datasets:
+        # ── Layer 1: FVM reference (thin, muted) ──────────────────────────────
+        for case_name, label, color, ls, lw, alpha in FVM_CASES:
+            if case_name not in fvm_datasets:
                 continue
-            d   = datasets[case_name]
-            xc  = shock_centre(d)            # m
-            x_r = (d["x"] - xc) * 1e6       # relative position in µm
-            mask = np.abs(x_r) <= half_um
-            ax.plot(x_r[mask], d[col_key][mask],
-                    color=color, ls=ls, lw=lw, label=label, alpha=0.9)
+            d      = fvm_datasets[case_name]
+            x_rel, mask = rel_x_um(d, half_um)
+            ax.plot(x_rel[mask], d[col_key][mask],
+                    color=color, ls=ls, lw=lw, alpha=alpha, label=label)
 
-        # Overlay reference data on the T panel only
+        # ── Layer 2: SPLAY DG (prominent) ─────────────────────────────────────
+        for case_name, label, color, ls, lw, alpha in DG_CASES:
+            if case_name not in dg_splay:
+                continue
+            d      = dg_splay[case_name]
+            x_rel, mask = rel_x_um(d, half_um)
+            ax.plot(x_rel[mask], d[col_key][mask],
+                    color=color, ls=ls, lw=lw, alpha=alpha, label=label, zorder=4)
+
+        # ── Layer 3 & 4: T panel only — reference DG .npy and MD scatter ──────
         if col_key == "T":
-            # MD data — x already in µm, shock-centred
+            if ref_dg is not None:
+                mask = np.abs(ref_dg["x_rel"]) <= half_um
+                ax.plot(ref_dg["x_rel"][mask], ref_dg["T"][mask],
+                        color="tab:brown", ls="-", lw=1.8, alpha=0.9,
+                        label="Ref. DG p=2", zorder=5)
+
             if md_data is not None:
                 mask = np.abs(md_data["x"]) <= half_um
-                if mask.any():
-                    ax.scatter(md_data["x"][mask], md_data["T"][mask],
-                               s=18, color="tab:green", marker="o",
-                               zorder=5, label="MD", alpha=0.85)
-            # DG (p=2) data — x in µm, shock-centred via T_SHOCK_MID
-            if dg_data is not None:
-                mask = np.abs(dg_data["x_rel"]) <= half_um
-                if mask.any():
-                    ax.plot(dg_data["x_rel"][mask], dg_data["T"][mask],
-                            color="tab:brown", ls="-", lw=1.5,
-                            zorder=4, label="DG p=2", alpha=0.85)
+                ax.scatter(md_data["x"][mask], md_data["T"][mask],
+                           s=20, color="tab:green", marker="o",
+                           alpha=0.85, zorder=6, label="MD")
+
+        # Annotate DG overshoot on the density panel
+        if col_key == "rho":
+            for case_name, label, color, *_ in DG_CASES:
+                if case_name not in dg_overshoot:
+                    continue
+                ov = dg_overshoot[case_name]
+                if ov > 1.15:
+                    ax.annotate(
+                        f"{label.split(',')[1].strip()}\nρ overshoot {ov:.2f}×\n(AV too small)",
+                        xy=(0.97, 0.97 - 0.18 * list(dg_overshoot).index(case_name)),
+                        xycoords="axes fraction",
+                        ha="right", va="top", fontsize=7.5,
+                        color=color,
+                        bbox=dict(boxstyle="round,pad=0.2", fc="white", ec=color, alpha=0.8)
+                    )
 
         ax.set_xlabel("x − x_shock  [µm]", fontsize=10)
         ax.set_ylabel(ylabel, fontsize=10)
         ax.set_xlim(-half_um, half_um)
         ax.ticklabel_format(style="sci", axis="y", scilimits=(-2, 4))
-        ax.grid(True, alpha=0.25, linestyle=":")
+        ax.axvline(0, color="k", lw=0.6, ls=":", alpha=0.35)
+        ax.grid(True, alpha=0.22, linestyle=":")
         ax.tick_params(labelsize=9)
-        ax.axvline(0, color="k", lw=0.6, ls=":", alpha=0.4)  # mark shock centre
 
-    for ax in axes:
-        ax.legend(fontsize=9, loc="upper right")
-
-    plt.tight_layout()
+        # Legend: DG + reference entries first, FVM at bottom
+        handles, labels = ax.get_legend_handles_labels()
+        # Sort: DG cases first, then reference/MD, then FVM
+        order = []
+        dg_labels  = {e[1] for e in DG_CASES}
+        ref_labels = {"Ref. DG p=2", "MD"}
+        for i, lbl in enumerate(labels):
+            if lbl in dg_labels or lbl in ref_labels:
+                order.insert(0, i)
+            else:
+                order.append(i)
+        ax.legend([handles[i] for i in order], [labels[i] for i in order],
+                  fontsize=8, loc="upper right", framealpha=0.85)
 
     if args.save:
         plt.savefig(args.save, dpi=150, bbox_inches="tight")
@@ -189,35 +276,33 @@ def main():
     else:
         plt.show()
 
-    # ── Shock thickness summary ───────────────────────────────────────────────
-    # L = |p_left - p_right| / |dp/dx|_max  (pressure-gradient definition)
-    # dp/dx computed with second-order central differences (one-sided at boundaries)
-    print(f"\nShock thickness  L = |Δp| / |dp/dx|_max  (within ±{half_um:.2f} µm window):")
-    print(f"  {'Case':<50}  {'L [nm]':>8}  {'cells (dx=3.8nm)':>18}")
-    for case_name, label, *_ in CASES:
-        if case_name not in datasets:
+    # ── Shock thickness: L = |Δp| / |dp/dx|_max ──────────────────────────────
+    all_cases = (
+        [(n, l) for n, l, *_ in DG_CASES] +
+        [(n, l) for n, l, *_ in FVM_CASES]
+    )
+    all_data = {**dg_splay, **fvm_datasets}
+    print(f"\nShock thickness  L = |Δp| / |dp/dx|_max  (±{half_um:.2f} µm window):")
+    print(f"  {'Case':<35}  {'L [nm]':>8}  {'N cells':>8}  {'dx [nm]':>8}")
+    for case_name, label in all_cases:
+        if case_name not in all_data:
             continue
-        d    = datasets[case_name]
-        xc   = shock_centre(d)
-        x_r  = (d["x"] - xc) * 1e6
-        mask = np.abs(x_r) <= half_um
-        xi   = d["x"][mask]
-        pi   = d["p"][mask]
+        d      = all_data[case_name]
+        x_rel, mask = rel_x_um(d, half_um)
+        xi     = d["x"][mask]
+        pi     = d["p"][mask]
         if len(xi) < 3:
             continue
-
-        # Second-order accurate dp/dx
         dpi_dx = np.zeros_like(pi)
         dpi_dx[1:-1] = (pi[2:] - pi[:-2]) / (xi[2:] - xi[:-2])
-        dpi_dx[0]    = (-3*pi[0] + 4*pi[1] - pi[2])     / (xi[2]  - xi[0])
-        dpi_dx[-1]   = ( 3*pi[-1] - 4*pi[-2] + pi[-3])  / (xi[-1] - xi[-3])
-
-        dpi_dx_max = np.max(np.abs(dpi_dx))
-        if dpi_dx_max < 1e-10:
+        dpi_dx[0]    = (-3*pi[0] + 4*pi[1] - pi[2])    / (xi[2]  - xi[0])
+        dpi_dx[-1]   = ( 3*pi[-1] - 4*pi[-2] + pi[-3]) / (xi[-1] - xi[-3])
+        mx = np.max(np.abs(dpi_dx))
+        if mx < 1e-10:
             continue
-        L  = abs((pi[0] - pi[-1]) / dpi_dx_max)
-        dx = xi[1] - xi[0] if len(xi) > 1 else 1.0
-        print(f"  {label:<50}  {L*1e9:>8.1f}  {L/dx:>18.1f}")
+        L  = abs((pi[0] - pi[-1]) / mx)
+        dx = (xi[-1] - xi[0]) / max(len(xi) - 1, 1)
+        print(f"  {label:<35}  {L*1e9:>8.1f}  {len(d['x']):>8d}  {dx*1e9:>8.2f}")
 
 
 if __name__ == "__main__":

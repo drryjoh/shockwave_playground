@@ -6,6 +6,7 @@
 #include "splay/config.hpp"
 #include "splay/transport.hpp"
 #include "splay/mpi_decomp.hpp"
+#include "splay/dg_state.hpp"
 
 namespace splay {
 
@@ -37,6 +38,24 @@ void ssprk3_step(
 /// Useful for reproducing the PeleC-like non-convergence behaviour.
 void godunov_split_step(
     State&                s,
+    const Mesh&           m,
+    const GasModel&       gas,
+    const TransportModel& tm,
+    const SolverConfig&   cfg,
+    const BCState&        bc_left,
+    const BCState&        bc_right,
+    const MPIDecomp&      decomp,
+    double                dt);
+
+/// Advance one DG time step using SSPRK3 (Gottlieb-Shu 1998).
+/// AV coefficients are recomputed from the current solution before each stage.
+///
+/// Stages (same Butcher tableau as ssprk3_step):
+///   U^(1) = U^n + dt * R(U^n)
+///   U^(2) = (3/4) U^n + (1/4)[ U^(1) + dt * R(U^(1)) ]
+///   U^n+1 = (1/3) U^n + (2/3)[ U^(2) + dt * R(U^(2)) ]
+void ssprk3_step_dg(
+    DGState&              s,
     const Mesh&           m,
     const GasModel&       gas,
     const TransportModel& tm,
