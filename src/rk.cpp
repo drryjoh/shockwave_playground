@@ -50,17 +50,17 @@ void ssprk3_step(
     Residual R(m.n_total);
 
     // ─── Stage 1: U^(1) = U^n + dt * R(U^n) ─────────────────────────────────
-    compute_residual(s, m, gas, tm, cfg, R);
+    compute_residual(s, m, gas, tm, cfg, R, ResidualPart::Full, dt);
     rk_combine(s1, s, s, R, 0.0, 1.0, dt, ib, ie);
     refresh(s1, m, gas, bc_left, bc_right, decomp);
 
     // ─── Stage 2: U^(2) = (3/4)*U^n + (1/4)*(U^(1) + dt*R(U^(1))) ──────────
-    compute_residual(s1, m, gas, tm, cfg, R);
+    compute_residual(s1, m, gas, tm, cfg, R, ResidualPart::Full, dt);
     rk_combine(s2, s, s1, R, 0.75, 0.25, dt, ib, ie);
     refresh(s2, m, gas, bc_left, bc_right, decomp);
 
     // ─── Stage 3: U^{n+1} = (1/3)*U^n + (2/3)*(U^(2) + dt*R(U^(2))) ─────────
-    compute_residual(s2, m, gas, tm, cfg, R);
+    compute_residual(s2, m, gas, tm, cfg, R, ResidualPart::Full, dt);
     rk_combine(s, s, s2, R, 1.0 / 3.0, 2.0 / 3.0, dt, ib, ie);
     refresh(s, m, gas, bc_left, bc_right, decomp);
 }
@@ -83,21 +83,21 @@ void godunov_split_step(
     Residual R(m.n_total);
 
     // ── Sub-step 1: SSPRK3 with inviscid-only residual (flatten applied) ──────
-    compute_residual(s, m, gas, tm, cfg, R, ResidualPart::InviscidOnly);
+    compute_residual(s, m, gas, tm, cfg, R, ResidualPart::InviscidOnly, dt);
     rk_combine(s1, s, s, R, 0.0, 1.0, dt, ib, ie);
     refresh(s1, m, gas, bc_left, bc_right, decomp);
 
-    compute_residual(s1, m, gas, tm, cfg, R, ResidualPart::InviscidOnly);
+    compute_residual(s1, m, gas, tm, cfg, R, ResidualPart::InviscidOnly, dt);
     rk_combine(s2, s, s1, R, 0.75, 0.25, dt, ib, ie);
     refresh(s2, m, gas, bc_left, bc_right, decomp);
 
-    compute_residual(s2, m, gas, tm, cfg, R, ResidualPart::InviscidOnly);
+    compute_residual(s2, m, gas, tm, cfg, R, ResidualPart::InviscidOnly, dt);
     rk_combine(s, s, s2, R, 1.0 / 3.0, 2.0 / 3.0, dt, ib, ie);
     refresh(s, m, gas, bc_left, bc_right, decomp);
 
     // ── Sub-step 2: explicit Euler with viscous-only residual ─────────────────
     if (cfg.viscous_terms) {
-        compute_residual(s, m, gas, tm, cfg, R, ResidualPart::ViscousOnly);
+        compute_residual(s, m, gas, tm, cfg, R, ResidualPart::ViscousOnly, dt);
         for (int i = ib; i < ie; ++i) {
             s.rho[i]  += dt * R.r_rho[i];
             s.rhou[i] += dt * R.r_rhou[i];

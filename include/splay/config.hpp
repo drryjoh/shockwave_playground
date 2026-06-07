@@ -4,7 +4,7 @@
 namespace splay {
 
 // ─── Inviscid scheme ──────────────────────────────────────────────────────────
-enum class InviscidScheme { Central, MUSCL, PPM };
+enum class InviscidScheme { Central, MUSCL, PPM, PPM_Pele };
 
 // ─── Riemann solver ───────────────────────────────────────────────────────────
 enum class RiemannSolver { Central, Rusanov, HLLC };

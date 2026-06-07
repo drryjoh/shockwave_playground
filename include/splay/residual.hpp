@@ -44,7 +44,8 @@ void compute_residual(
     const TransportModel& tm,
     const SolverConfig&   cfg,
     Residual&             R,
-    ResidualPart          part = ResidualPart::Full);
+    ResidualPart          part = ResidualPart::Full,
+    double                dt   = 0.0);
 
 /// Compute stable time-step satisfying CFL (convective + diffusive when viscous).
 /// Returns global min dt across all local cells.

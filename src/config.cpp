@@ -19,7 +19,8 @@ static double to_si_length(double val, const std::string& units) {
 static InviscidScheme parse_inviscid_scheme(const std::string& s) {
     if (s == "central") return InviscidScheme::Central;
     if (s == "muscl")   return InviscidScheme::MUSCL;
-    if (s == "ppm")     return InviscidScheme::PPM;
+    if (s == "ppm")      return InviscidScheme::PPM;
+    if (s == "ppm_pele") return InviscidScheme::PPM_Pele;
     throw std::runtime_error("Unknown inviscid_scheme: " + s);
 }
 

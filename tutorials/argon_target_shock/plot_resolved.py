@@ -34,6 +34,7 @@ CASES = [
     ("argon_shock_ppm_navier_stokes",                   "PPM NS",                      "tab:orange", "-",  1.8),
     ("argon_shock_ppm_navier_stokes_flatten",           "PPM NS + flatten",            "tab:red",    "--", 1.8),
     ("argon_shock_ppm_navier_stokes_flatten_split",     "PPM NS + flatten + split",    "tab:purple", ":",  2.0),
+    ("argon_shock_ppm_pele_navier_stokes",              "PPM_pele NS",                 "tab:pink",   "-.", 2.0),
     ("argon_shock_muscl_navier_stokes",                 "MUSCL NS",                    "tab:blue",   "-",  1.8),
     ("argon_shock_muscl_navier_stokes_flatten",         "MUSCL NS + flatten",          "tab:cyan",   "--", 1.8),
 ]
@@ -189,8 +190,10 @@ def main():
         plt.show()
 
     # ── Shock thickness summary ───────────────────────────────────────────────
-    print(f"\nShock thickness (10–90%% density, within ±{half_um:.2f} µm window):")
-    print(f"  {'Case':<45}  {'delta_x [nm]':>13}  {'cells (dx=3.8nm)':>18}")
+    # L = |p_left - p_right| / |dp/dx|_max  (pressure-gradient definition)
+    # dp/dx computed with second-order central differences (one-sided at boundaries)
+    print(f"\nShock thickness  L = |Δp| / |dp/dx|_max  (within ±{half_um:.2f} µm window):")
+    print(f"  {'Case':<50}  {'L [nm]':>8}  {'cells (dx=3.8nm)':>18}")
     for case_name, label, *_ in CASES:
         if case_name not in datasets:
             continue
@@ -198,16 +201,23 @@ def main():
         xc   = shock_centre(d)
         x_r  = (d["x"] - xc) * 1e6
         mask = np.abs(x_r) <= half_um
-        rho  = d["rho"][mask]
-        x_w  = d["x"][mask]
-        rmin, rmax = rho.min(), rho.max()
-        if rmax == rmin:
+        xi   = d["x"][mask]
+        pi   = d["p"][mask]
+        if len(xi) < 3:
             continue
-        lo = rmin + 0.1 * (rmax - rmin)
-        hi = rmin + 0.9 * (rmax - rmin)
-        dx = x_w[1] - x_w[0] if len(x_w) > 1 else 1.0
-        thick = abs(x_w[np.argmin(np.abs(rho - hi))] - x_w[np.argmin(np.abs(rho - lo))])
-        print(f"  {label:<45}  {thick*1e9:>13.1f}  {thick/dx:>18.1f}")
+
+        # Second-order accurate dp/dx
+        dpi_dx = np.zeros_like(pi)
+        dpi_dx[1:-1] = (pi[2:] - pi[:-2]) / (xi[2:] - xi[:-2])
+        dpi_dx[0]    = (-3*pi[0] + 4*pi[1] - pi[2])     / (xi[2]  - xi[0])
+        dpi_dx[-1]   = ( 3*pi[-1] - 4*pi[-2] + pi[-3])  / (xi[-1] - xi[-3])
+
+        dpi_dx_max = np.max(np.abs(dpi_dx))
+        if dpi_dx_max < 1e-10:
+            continue
+        L  = abs((pi[0] - pi[-1]) / dpi_dx_max)
+        dx = xi[1] - xi[0] if len(xi) > 1 else 1.0
+        print(f"  {label:<50}  {L*1e9:>8.1f}  {L/dx:>18.1f}")
 
 
 if __name__ == "__main__":

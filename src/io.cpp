@@ -138,9 +138,10 @@ void write_restart(const State&       s,
         mf << "dx: "      << m.dx            << "\n";
         mf << "inviscid_scheme: ";
         switch (cfg.solver.inviscid_scheme) {
-            case InviscidScheme::Central: mf << "central\n"; break;
-            case InviscidScheme::MUSCL:   mf << "muscl\n";   break;
-            case InviscidScheme::PPM:     mf << "ppm\n";     break;
+            case InviscidScheme::Central:  mf << "central\n";  break;
+            case InviscidScheme::MUSCL:    mf << "muscl\n";    break;
+            case InviscidScheme::PPM:      mf << "ppm\n";      break;
+            case InviscidScheme::PPM_Pele: mf << "ppm_pele\n"; break;
         }
         mf << "viscous_terms: " << (cfg.solver.viscous_terms ? "true" : "false") << "\n";
     }

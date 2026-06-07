@@ -1,5 +1,6 @@
 #include "splay/residual.hpp"
 #include "splay/reconstruction.hpp"
+#include "splay/reconstruction_ppm_pele.hpp"
 #include "splay/riemann.hpp"
 #include "splay/viscous_flux.hpp"
 #include <cmath>
@@ -27,7 +28,8 @@ void compute_residual(
     const TransportModel& tm,
     const SolverConfig&   cfg,
     Residual&             R,
-    ResidualPart          part)
+    ResidualPart          part,
+    double                dt)
 {
     R.zero();
 
@@ -52,10 +54,19 @@ void compute_residual(
     std::vector<Flux3> inv_flux(n, {0.0, 0.0, 0.0});
     if (do_inviscid) {
         FaceStates fs(n);
-        reconstruct(s.rho, s.u, s.p, s.T,
-                    cfg.inviscid_scheme, cfg.limiter, gas.gamma,
-                    face_begin, face_end, fs,
-                    cfg.flatten, cfg.flatten_z1, cfg.flatten_z2);
+        if (cfg.inviscid_scheme == InviscidScheme::PPM_Pele) {
+            reconstruct_ppm_pele(
+                s.rho, s.u, s.p, s.T,
+                gas.gamma, gas.R,
+                dt, m.dx,
+                face_begin, face_end, fs,
+                cfg.flatten, cfg.flatten_z1, cfg.flatten_z2);
+        } else {
+            reconstruct(s.rho, s.u, s.p, s.T,
+                        cfg.inviscid_scheme, cfg.limiter, gas.gamma,
+                        face_begin, face_end, fs,
+                        cfg.flatten, cfg.flatten_z1, cfg.flatten_z2);
+        }
 
         for (int f = face_begin; f < face_end; ++f) {
             inv_flux[f] = compute_inviscid_flux(

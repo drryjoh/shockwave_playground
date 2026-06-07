@@ -58,6 +58,7 @@ set(SPLAY_SRCS
     src/state.cpp
     src/transport.cpp
     src/reconstruction.cpp
+    src/reconstruction_ppm_pele.cpp
     src/riemann.cpp
     src/viscous_flux.cpp
     src/residual.cpp
