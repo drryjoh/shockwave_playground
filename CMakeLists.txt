@@ -112,6 +112,7 @@ if(SPLAY_BUILD_TESTS)
         tests/test_normal_shock.cpp
         tests/test_mpi_decomp.cpp
         tests/test_restart.cpp
+        tests/test_sod.cpp
     )
 
     foreach(test_src ${TEST_SRCS})

@@ -74,7 +74,12 @@ int main(int argc, char** argv) {
                 std::cout << "[SPLAY] Restarting from step=" << step
                           << " time=" << time << "\n";
         } else {
-            if (cfg.init.type == "gaussian_perturbation") {
+            if (cfg.init.type == "step") {
+                splay::init_step(s, m, gas,
+                    cfg.init.rho_left,  cfg.init.p_left,  cfg.init.u_left,
+                    cfg.init.rho_right, cfg.init.p_right, cfg.init.u_right,
+                    cfg.init.location);
+            } else if (cfg.init.type == "gaussian_perturbation") {
                 splay::init_gaussian_perturbation(s, m, gas,
                     cfg.init.p_left, cfg.init.T_left, cfg.init.u_left,
                     cfg.init.amplitude, cfg.init.location, cfg.init.sigma);

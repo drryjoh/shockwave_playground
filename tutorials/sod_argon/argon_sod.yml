@@ -1,0 +1,44 @@
+case_name: argon_sod
+
+gas: argon
+
+domain.left:
+  type: outflow
+
+domain.right:
+  type: outflow
+
+grid:
+  units: m
+  x_min: 0.0
+  x_max: 1.0
+  n: 400
+  ghost_cells: 3
+
+initialization:
+  type: step
+  units: m
+  location: 0.5
+  left:
+    density:  1.0       # kg/m³  → T ≈ 480 K for argon
+    pressure: 100000.0  # Pa  (1 bar)
+    velocity: 0.0
+  right:
+    density:  0.125     # kg/m³  → T ≈ 384 K for argon
+    pressure:  10000.0  # Pa  (0.1 bar)
+    velocity: 0.0
+
+solver:
+  cfl: 0.5
+  # t_end = 0.2 * L / c_L  where c_L = sqrt(γ p_L / ρ_L) ≈ 408 m/s  → ≈ 4.90e-4 s
+  time_end: 4.90e-4
+  rk: 3
+  viscous_terms: false
+  inviscid_scheme: muscl
+  riemann_solver: hllc
+  limiter: vanleer
+
+diagnostics:
+  log.step: 50
+  snapshot.step: 200
+  units: SI

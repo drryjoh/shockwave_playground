@@ -42,6 +42,13 @@ void init_tanh(State& s, const Mesh& m, const GasModel& gas,
                double p_R, double T_R, double u_R,
                double x_shock, double delta);
 
+/// Initialize state as a step function (Sod / Riemann problem ICs).
+/// Cells with x <= x_diaphragm get the left state; cells to the right get the right state.
+void init_step(State& s, const Mesh& m, const GasModel& gas,
+               double rho_L, double p_L, double u_L,
+               double rho_R, double p_R, double u_R,
+               double x_diaphragm);
+
 /// Initialize state as uniform base + small Gaussian pressure perturbation.
 /// p(x) = p0 * (1 + amplitude * exp(-((x-x0)/sigma)^2))
 /// Density is held constant at p0/(R*T0); temperature varies with pressure.

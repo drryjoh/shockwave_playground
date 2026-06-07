@@ -218,9 +218,26 @@ Config load_config(const std::string& yaml_path, const std::string& restart_path
             cfg.init.T_left = required<double>(lft, "temperature");
             cfg.init.u_left = required<double>(lft, "velocity");
 
+        } else if (cfg.init.type == "step") {
+            cfg.init.location = required<double>(init_node, "location");
+            if (init_units != "SI" && init_units != "m")
+                cfg.init.location = to_si_length(cfg.init.location, init_units);
+
+            auto lft = init_node["left"];
+            auto rgt = init_node["right"];
+            if (!lft || !rgt)
+                throw std::runtime_error("initialization: step requires 'left' and 'right' sub-blocks.");
+
+            cfg.init.rho_left  = required<double>(lft, "density");
+            cfg.init.p_left    = required<double>(lft, "pressure");
+            cfg.init.u_left    = optional<double>(lft, "velocity", 0.0);
+            cfg.init.rho_right = required<double>(rgt, "density");
+            cfg.init.p_right   = required<double>(rgt, "pressure");
+            cfg.init.u_right   = optional<double>(rgt, "velocity", 0.0);
+
         } else {
             throw std::runtime_error("initialization: unknown type '" + cfg.init.type +
-                                     "'. Supported: tanh, gaussian_perturbation.");
+                                     "'. Supported: tanh, step, gaussian_perturbation.");
         }
     }
 

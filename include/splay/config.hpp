@@ -36,6 +36,9 @@ struct InitConfig {
     double p_right = 0.0;
     double T_right = 0.0;
     double u_right = 0.0;
+    // Right density — used by "step" initialization; tanh uses T_right instead.
+    double rho_left  = 0.0;
+    double rho_right = 0.0;
     // Gaussian perturbation parameters
     double amplitude = 1e-4;  // fractional amplitude of pressure perturbation
     double sigma     = 1e-2;  // m (Gaussian half-width)

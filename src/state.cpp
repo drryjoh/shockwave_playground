@@ -70,6 +70,27 @@ void init_tanh(State& s, const Mesh& m, const GasModel& gas,
     }
 }
 
+void init_step(State& s, const Mesh& m, const GasModel& gas,
+               double rho_L, double p_L, double u_L,
+               double rho_R, double p_R, double u_R,
+               double x_diaphragm) {
+    const int n = m.n_total;
+    for (int i = 0; i < n; ++i) {
+        const bool left  = (m.x_cell[i] <= x_diaphragm);
+        const double rho = left ? rho_L : rho_R;
+        const double p   = left ? p_L   : p_R;
+        const double u   = left ? u_L   : u_R;
+        const double T   = p / (gas.R * rho);
+        const double e   = gas.cv * T;
+        s.rho[i]  = rho;
+        s.p[i]    = p;
+        s.u[i]    = u;
+        s.T[i]    = T;
+        s.rhou[i] = rho * u;
+        s.rhoE[i] = rho * (e + 0.5 * u * u);
+    }
+}
+
 void init_gaussian_perturbation(State& s, const Mesh& m, const GasModel& gas,
                                  double p0, double T0, double u0,
                                  double amplitude, double x0, double sigma)
