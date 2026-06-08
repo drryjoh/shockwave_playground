@@ -94,6 +94,34 @@ void write_csv(const State&          s,
 }
 
 // ─── DG DOF CSV snapshot ──────────────────────────────────────────────────────
+//
+// Each cell is written as N_PLOT_PER_CELL uniformly-spaced points evaluated
+// from the p-th order Lagrange polynomial through the GLL DOFs.  This avoids
+// pushing polynomial reconstruction into downstream Python tools, and makes
+// the output directly plottable as a polyline with NaN breaks between cells.
+//
+// The 'cell' column (0-based interior index) lets callers insert NaN breaks
+// between cells to visualise DG inter-element discontinuities.
+//
+static constexpr int N_PLOT_PER_CELL = 10;
+
+// Evaluate the Lagrange polynomial of order p at reference coordinate xi
+// given nodal values stored in val[0..p] at the GLL nodes.
+// Supports p=1 (nodes -1,+1) and p=2 (nodes -1,0,+1).
+static double eval_lagrange(int p, const double* val, double xi)
+{
+    if (p == 1) {
+        // L0=(1-xi)/2, L1=(1+xi)/2
+        return val[0] * 0.5 * (1.0 - xi)
+             + val[1] * 0.5 * (1.0 + xi);
+    }
+    // p == 2: GLL nodes at -1, 0, +1
+    // L0=xi(xi-1)/2,  L1=1-xi^2,  L2=xi(xi+1)/2
+    return val[0] * (xi * (xi - 1.0) * 0.5)
+         + val[1] * (1.0 - xi * xi)
+         + val[2] * (xi * (xi + 1.0) * 0.5);
+}
+
 void write_csv_dg(const DGState&        dgs,
                   const Mesh&           m,
                   const TransportModel& tm,
@@ -106,7 +134,7 @@ void write_csv_dg(const DGState&        dgs,
 {
     const int ib      = m.interior_begin();
     const int ie      = m.interior_end();
-    const int ndof    = dgs.n_dof;
+    const int p       = dgs.p;
     const double half_dx = 0.5 * m.dx;
 
     std::string rank_dir = output_dir + "/" + case_name + "/snapshots";
@@ -119,28 +147,48 @@ void write_csv_dg(const DGState&        dgs,
     if (!out) throw std::runtime_error("Cannot open DG output file: " + filename);
 
     out << std::scientific << std::setprecision(10);
-    out << "# time=" << time << " step=" << step << "\n";
-    out << "x,rho,u,p,T,Mach,mu,kappa\n";
+    out << "# time=" << time << " step=" << step
+        << " poly_order=" << p
+        << " n_plot_per_cell=" << N_PLOT_PER_CELL << "\n";
+    out << "x,cell,rho,u,p,T,Mach,mu,kappa\n";
+
+    // Precompute N_PLOT_PER_CELL uniformly-spaced reference coordinates in [-1,1]
+    double xi_plot[N_PLOT_PER_CELL];
+    for (int k = 0; k < N_PLOT_PER_CELL; ++k)
+        xi_plot[k] = -1.0 + 2.0 * k / (N_PLOT_PER_CELL - 1);
 
     for (int i = ib; i < ie; ++i) {
-        for (int j = 0; j < ndof; ++j) {
-            const double x    = m.x_cell[i] + dgs.basis.xi[j] * half_dx;
-            const double rho  = dgs.rho   [j][i];
-            const double u    = dgs.u      [j][i];
-            const double p    = dgs.prim_p [j][i];
-            const double T    = dgs.T      [j][i];
-            const double a    = gas.sound_speed(p, rho);
+        const int cell_idx = i - ib;
+
+        // Collect nodal DOF values for this cell
+        double rho_n[3], u_n[3], pres_n[3], T_n[3];
+        for (int j = 0; j <= p; ++j) {
+            rho_n [j] = dgs.rho   [j][i];
+            u_n   [j] = dgs.u     [j][i];
+            pres_n[j] = dgs.prim_p[j][i];
+            T_n   [j] = dgs.T     [j][i];
+        }
+
+        for (int k = 0; k < N_PLOT_PER_CELL; ++k) {
+            const double xi   = xi_plot[k];
+            const double x    = m.x_cell[i] + xi * half_dx;
+            const double rho  = eval_lagrange(p, rho_n,  xi);
+            const double u    = eval_lagrange(p, u_n,    xi);
+            const double pres = eval_lagrange(p, pres_n, xi);
+            const double T    = eval_lagrange(p, T_n,    xi);
+            const double a    = gas.sound_speed(pres, rho);
             const double Mach = u / a;
             const double mu_v = tm.viscosity(T);
             const double k_v  = tm.conductivity(T);
-            out << x    << ","
-                << rho  << ","
-                << u    << ","
-                << p    << ","
-                << T    << ","
-                << Mach << ","
-                << mu_v << ","
-                << k_v  << "\n";
+            out << x         << ","
+                << cell_idx  << ","
+                << rho       << ","
+                << u         << ","
+                << pres      << ","
+                << T         << ","
+                << Mach      << ","
+                << mu_v      << ","
+                << k_v       << "\n";
         }
     }
     out.close();
@@ -153,7 +201,7 @@ void write_csv_dg(const DGState&        dgs,
         std::ofstream comb(combined);
         if (!comb) throw std::runtime_error("Cannot open combined DG file: " + combined);
         comb << "# time=" << time << " step=" << step << " nranks=" << decomp.nranks << "\n";
-        comb << "x,rho,u,p,T,Mach,mu,kappa\n";
+        comb << "x,cell,rho,u,p,T,Mach,mu,kappa\n";
         for (int r = 0; r < decomp.nranks; ++r) {
             std::string rfile = rank_dir + "/step_" + step_str(step)
                               + "_rank" + std::to_string(r) + ".csv";

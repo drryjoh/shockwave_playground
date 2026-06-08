@@ -290,16 +290,16 @@ void compute_residual_dg(
                 // Viscous face: add right, subtract left (opposite to inviscid)
                 if (j == p) { Rru += fv_ru[fR];  RrE += fv_rE[fR]; }
                 if (j == 0) { Rru -= fv_ru[fL];  RrE -= fv_rE[fL]; }
-                // BR2 lifting: +G(y⁺):(⟨y⟩−y⁺)⊗n · ∇φ_j at each face boundary.
+                // BR2 lifting: η₀·G(y⁺):(⟨y⟩−y⁺)⊗n · ∇φ_j at each face boundary.
+                // η₀ = n_faces + 1 = 3 (in 1D each element has 2 faces).
                 // Uses interior transport (mu/kap at the face node of this cell).
-                // Sign is POSITIVE at both faces: (⟨y⟩−y⁺)⊗n_out = [u]/2 × n_out,
-                // and n_out=+1 at right face, n_out=-1 at left face, both give +[u]/2.
-                const double br2_ru_R = mu_dof [p][i] * fjump_u[fR];
-                const double br2_rE_R = mu_dof [p][i] * s.u[p][i] * fjump_u[fR]
-                                      + kap_dof[p][i] * fjump_T[fR];
-                const double br2_ru_L = mu_dof [0][i] * fjump_u[fL];
-                const double br2_rE_L = mu_dof [0][i] * s.u[0][i] * fjump_u[fL]
-                                      + kap_dof[0][i] * fjump_T[fL];
+                constexpr double eta0 = 3.0;   // n_faces + 1 = 2 + 1
+                const double br2_ru_R = eta0 * mu_dof [p][i] * fjump_u[fR];
+                const double br2_rE_R = eta0 * (mu_dof [p][i] * s.u[p][i] * fjump_u[fR]
+                                              + kap_dof[p][i] * fjump_T[fR]);
+                const double br2_ru_L = eta0 * mu_dof [0][i] * fjump_u[fL];
+                const double br2_rE_L = eta0 * (mu_dof [0][i] * s.u[0][i] * fjump_u[fL]
+                                              + kap_dof[0][i] * fjump_T[fL]);
                 Rru += br2_ru_R * D[p][j] * inv_h2 + br2_ru_L * D[0][j] * inv_h2;
                 RrE += br2_rE_R * D[p][j] * inv_h2 + br2_rE_L * D[0][j] * inv_h2;
             }

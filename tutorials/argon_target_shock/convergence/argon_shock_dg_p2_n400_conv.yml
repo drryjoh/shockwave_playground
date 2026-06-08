@@ -1,0 +1,49 @@
+case_name: argon_shock_dg_p2_n400_conv
+
+gas: argon
+
+domain.left:
+  type: inflow
+  pressure: 1.56880625e7
+  temperature: 2632.24759509
+  velocity: 1168.9
+
+domain.right:
+  type: outflow
+
+grid:
+  units: cm
+  L: 7.600403652e-4
+  n: 400
+  ghost_cells: 2
+
+initialization:
+  type: tanh
+  units: SI
+  location: 3.0e-6
+  thickness: 5.0e-8
+  left:
+    pressure: 1.56880625e7
+    temperature: 2632.24759509
+    velocity: 1168.9
+  right:
+    pressure: 5.0e5
+    temperature: 300.0
+    velocity: 0.0
+
+solver:
+  spatial: dg
+  cfl: 0.2
+  time_end: 2.3352e-09
+  rk: 3
+  viscous_terms: true
+  riemann_solver: hllc
+  dg:
+    poly_order: 2
+    av_method: none
+    visc_scheme: br2
+
+diagnostics:
+  log.step: 400
+  snapshot.step: 400
+  units: SI
