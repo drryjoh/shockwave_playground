@@ -1,4 +1,4 @@
-case_name: argon_shock_dg_p2_n200_conv
+case_name: argon_shock_ppm_ns_n200_conv
 
 gas: argon
 
@@ -15,13 +15,13 @@ grid:
   units: cm
   L: 7.600403652e-4
   n: 200
-  ghost_cells: 2
+  ghost_cells: 3
 
 initialization:
   type: tanh
   units: SI
   location: 3.0e-6
-  thickness: 1.5e-7
+  thickness: 5.0e-8
   left:
     pressure: 1.56880625e7
     temperature: 2632.24759509
@@ -32,19 +32,16 @@ initialization:
     velocity: 0.0
 
 solver:
-  spatial: dg
-  cfl: 0.05
+  cfl: 0.4
   time_end: 2.3352e-09
   rk: 3
   viscous_terms: true
+  viscous_dt: false
+  inviscid_scheme: ppm
   riemann_solver: hllc
-  dg:
-    poly_order: 2
-    av_method: none
-    visc_scheme: br2
-    positivity_limiter: true
+  limiter: ppm
 
 diagnostics:
-  log.step: 200
-  snapshot.step: 200
+  log.step: 40
+  snapshot.step: 100
   units: SI

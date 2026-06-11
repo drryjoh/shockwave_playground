@@ -34,10 +34,10 @@ DEFAULT_OUTPUT = os.path.join(REPO_ROOT, "output")
 # ── Convergence cases (in desired legend order, coarse → fine) ────────────────
 # (case_name, label, color)
 CONV_CASES = [
-    ("argon_shock_dg_p2_n100_conv",  "DG p=2, n=100",  "#aaaaff"),
-    ("argon_shock_dg_p2_n200_conv",  "DG p=2, n=200",  "#7777dd"),
-    ("argon_shock_dg_p2_n400_conv",  "DG p=2, n=400",  "#4444bb"),
-    ("argon_shock_dg_p2_n800_conv",  "DG p=2, n=800",  "#110099"),
+    ("argon_shock_dg_p2_n100_conv",  "DG p=2, n=100",  "tab:cyan"),
+    ("argon_shock_dg_p2_n200_conv",  "DG p=2, n=200",  "tab:olive"),
+    ("argon_shock_dg_p2_n400_conv",  "DG p=2, n=400",  "tab:orange"),
+    ("argon_shock_dg_p2_n800_conv",  "DG p=2, n=800",  "tab:green"),
 ]
 
 T_SHOCK_MID = 1500.0   # K — shock centring threshold
@@ -180,13 +180,13 @@ def main():
         xr, yr = make_by_cell(d, xc, half_um, "rho")
         xT, yT = make_by_cell(d, xc, half_um, "T")
 
-        ax_rho.plot(xr, yr, color=color, lw=1.2, label=label)
-        ax_T  .plot(xT, yT, color=color, lw=1.2, label=label)
+        ax_rho.plot(xr, yr, color=color, lw=2.0, label=label)
+        ax_T  .plot(xT, yT, color=color, lw=2.0, label=label)
 
     # Reference DG (T panel only)
     if ref_dg is not None:
         ax_T.plot(ref_dg[0], ref_dg[1],
-                  color="tab:brown", lw=1.5, ls="--", label="Ref. DG p=2", zorder=5)
+                  color="tab:brown", lw=2.0, ls="--", label="Ref. DG p=2", zorder=5)
 
     # ── Formatting ────────────────────────────────────────────────────────────
     for ax, ylabel in [(ax_rho, r"Density  [kg/m³]"), (ax_T, "Temperature  [K]")]:

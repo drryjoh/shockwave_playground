@@ -292,6 +292,7 @@ void compute_residual_dg(
                 if (j == 0) { Rru -= fv_ru[fL];  RrE -= fv_rE[fL]; }
                 // BR2 lifting: η₀·G(y⁺):(⟨y⟩−y⁺)⊗n · ∇φ_j at each face boundary.
                 // η₀ = n_faces + 1 = 3 (in 1D each element has 2 faces).
+                // This matches the JENRE/Cockburn-Kanschat stability requirement η₀ ≥ n_faces.
                 // Uses interior transport (mu/kap at the face node of this cell).
                 constexpr double eta0 = 3.0;   // n_faces + 1 = 2 + 1
                 const double br2_ru_R = eta0 * mu_dof [p][i] * fjump_u[fR];

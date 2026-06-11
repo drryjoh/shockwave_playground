@@ -128,6 +128,80 @@ static void dg_rk_combine(
 }
 
 /// Update primitives, apply BCs, exchange MPI ghosts, re-update ghost primitives.
+// ── Positivity-preserving limiter ─────────────────────────────────────────────
+// For each cell: if any DOF has ρ < ε_rho or T < T_min, rescale all
+// conservative DOFs linearly toward the cell GLL-quadrature average so the
+// minimum value is just above the floor.  Preserves the cell average exactly.
+// Applied to conservative variables (ρ, ρu, ρE) before update_primitives.
+static constexpr double PPL_RHO_MIN = 1e-4;   // kg/m³
+static constexpr double PPL_T_MIN   = 1.0;    // K  (used via p = ρRT/M)
+
+static void apply_positivity_limiter_dg(DGState& s, const Mesh& m,
+                                        const GasModel& gas)
+{
+    const int    ib   = m.interior_begin();
+    const int    ie   = m.interior_end();
+    const int    nd   = s.n_dof;
+    const auto&  w    = s.basis.w;
+    const double w_sum = 2.0;   // GLL weights always sum to 2 on [-1,1]
+
+    for (int i = ib; i < ie; ++i) {
+        // ── Cell-average conservative variables (GLL quadrature) ─────────────
+        double rho_avg = 0.0, rhou_avg = 0.0, rhoE_avg = 0.0;
+        for (int j = 0; j < nd; ++j) {
+            rho_avg  += w[j] * s.rho [j][i];
+            rhou_avg += w[j] * s.rhou[j][i];
+            rhoE_avg += w[j] * s.rhoE[j][i];
+        }
+        rho_avg  /= w_sum;
+        rhou_avg /= w_sum;
+        rhoE_avg /= w_sum;
+
+        // ── Density limiter ───────────────────────────────────────────────────
+        double rho_min = s.rho[0][i];
+        for (int j = 1; j < nd; ++j) rho_min = std::min(rho_min, s.rho[j][i]);
+
+        if (rho_min < PPL_RHO_MIN && rho_avg > PPL_RHO_MIN) {
+            const double sf = std::min(1.0, 0.9999 * (rho_avg - PPL_RHO_MIN)
+                                                   / (rho_avg - rho_min));
+            for (int j = 0; j < nd; ++j) {
+                s.rho [j][i] = rho_avg  + sf * (s.rho [j][i] - rho_avg);
+                s.rhou[j][i] = rhou_avg + sf * (s.rhou[j][i] - rhou_avg);
+                s.rhoE[j][i] = rhoE_avg + sf * (s.rhoE[j][i] - rhoE_avg);
+            }
+            // Re-read rho_avg after scaling (unchanged, but rhou/rhoE now safe)
+        }
+
+        // ── Pressure/temperature limiter ──────────────────────────────────────
+        // Estimate internal energy e_j = E_j - 0.5*u_j^2 for each DOF.
+        // Use p_min_physical from gas: p = (γ-1)*ρ*e = ρ*R/M * T
+        // Simplified: check e_j > 0 (internal energy positivity).
+        double e_min = 1e300;
+        for (int j = 0; j < nd; ++j) {
+            const double rho_j = s.rho [j][i];
+            if (rho_j <= 0.0) { e_min = -1.0; break; }
+            const double u_j = s.rhou[j][i] / rho_j;
+            const double e_j = s.rhoE[j][i] / rho_j - 0.5 * u_j * u_j;
+            e_min = std::min(e_min, e_j);
+        }
+
+        const double e_avg = (rho_avg > 0.0)
+            ? (rhoE_avg / rho_avg - 0.5 * (rhou_avg / rho_avg) * (rhou_avg / rho_avg))
+            : 0.0;
+        const double e_floor = gas.total_energy(PPL_T_MIN, 0.0);  // e at T_min, u=0
+
+        if (e_min < e_floor && e_avg > e_floor) {
+            const double sf = std::min(1.0, 0.9999 * (e_avg - e_floor)
+                                                   / (e_avg - e_min));
+            for (int j = 0; j < nd; ++j) {
+                s.rho [j][i] = rho_avg  + sf * (s.rho [j][i] - rho_avg);
+                s.rhou[j][i] = rhou_avg + sf * (s.rhou[j][i] - rhou_avg);
+                s.rhoE[j][i] = rhoE_avg + sf * (s.rhoE[j][i] - rhoE_avg);
+            }
+        }
+    }
+}
+
 static void dg_refresh(DGState& s, const Mesh& m, const GasModel& gas,
                        const BCState& bc_left, const BCState& bc_right,
                        const MPIDecomp& decomp)
@@ -161,22 +235,27 @@ void ssprk3_step_dg(
     DGState    s1(m.n_total, s.p), s2(m.n_total, s.p);
     DGResidual R(m.n_total, s.n_dof);
 
+    const bool ppl = cfg.dg.positivity_limiter;
+
     // ─── Stage 1: U^(1) = U^n + dt * R(U^n) ─────────────────────────────────
     compute_av_dg(s, m, gas, cfg.dg);
     compute_residual_dg(s, m, gas, tm, cfg, R);
     dg_rk_combine(s1, s, s, R, 0.0, 1.0, dt, ib, ie);
+    if (ppl) apply_positivity_limiter_dg(s1, m, gas);
     dg_refresh(s1, m, gas, bc_left, bc_right, decomp);
 
     // ─── Stage 2: U^(2) = (3/4)U^n + (1/4)(U^(1) + dt*R(U^(1))) ─────────────
     compute_av_dg(s1, m, gas, cfg.dg);
     compute_residual_dg(s1, m, gas, tm, cfg, R);
     dg_rk_combine(s2, s, s1, R, 0.75, 0.25, dt, ib, ie);
+    if (ppl) apply_positivity_limiter_dg(s2, m, gas);
     dg_refresh(s2, m, gas, bc_left, bc_right, decomp);
 
     // ─── Stage 3: U^{n+1} = (1/3)U^n + (2/3)(U^(2) + dt*R(U^(2))) ───────────
     compute_av_dg(s2, m, gas, cfg.dg);
     compute_residual_dg(s2, m, gas, tm, cfg, R);
     dg_rk_combine(s, s, s2, R, 1.0 / 3.0, 2.0 / 3.0, dt, ib, ie);
+    if (ppl) apply_positivity_limiter_dg(s, m, gas);
     dg_refresh(s, m, gas, bc_left, bc_right, decomp);
 }
 

@@ -25,6 +25,7 @@ struct DGConfig {
     // s0 < 0 triggers auto-selection: s0 = -p*p (scales with order).
     double       s0            = -4.0;  ///< log10 threshold (smooth ↔ shocked)
     double       kappa         = 1.0;   ///< sigmoid half-width in log10 space
+    bool         positivity_limiter = false; ///< rescale DOFs toward cell avg if ρ or T go negative
 };
 
 // ─── Inviscid scheme ──────────────────────────────────────────────────────────

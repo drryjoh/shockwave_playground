@@ -42,6 +42,7 @@ solver:
     poly_order: 2
     av_method: none
     visc_scheme: br2
+    positivity_limiter: true
 
 diagnostics:
   log.step: 100

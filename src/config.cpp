@@ -177,6 +177,8 @@ Config load_config(const std::string& yaml_path, const std::string& restart_path
                 cfg.solver.dg.C_av         = optional<double>(dg_node, "C_av",  0.5);
                 cfg.solver.dg.s0           = optional<double>(dg_node, "s0",   -4.0);
                 cfg.solver.dg.kappa        = optional<double>(dg_node, "kappa", 1.0);
+                cfg.solver.dg.positivity_limiter =
+                    optional<bool>(dg_node, "positivity_limiter", false);
             }
             if (cfg.solver.dg.poly_order < 1 || cfg.solver.dg.poly_order > 2)
                 throw std::runtime_error("solver.dg.poly_order must be 1 or 2.");

@@ -2,173 +2,207 @@
 """
 SPLAY – Tutorial comparison plot.
 
-Reads the final combined CSV snapshot from each of the five tutorial cases
-and overlays them for comparison.
+Reads the final combined CSV snapshot from each of the tutorial cases
+and overlays them, centred at T = 1500 K with a ±window µm x-axis.
 
 Usage
 -----
-    python tutorials/argon_target_shock/plot_compare.py [output_dir]
-
-Default output_dir is "output/".
+    python tutorials/argon_target_shock/plot_compare.py
+    python tutorials/argon_target_shock/plot_compare.py --output_dir output --window 0.15
 """
 
 import sys
 import os
 import glob
+import argparse
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.cm as cm
 
-OUTPUT_DIR = sys.argv[1] if len(sys.argv) > 1 else "output"
+SCRIPT_DIR     = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT      = os.path.abspath(os.path.join(SCRIPT_DIR, "..", ".."))
+DEFAULT_OUTPUT = os.path.join(REPO_ROOT, "output")
 
 CASES = [
-    ("argon_shock_central_navier_stokes",  "Central NS",          "k",            "-",   2.5),
-    ("argon_shock_muscl_euler",            "MUSCL Euler n=500",   "tab:blue",     "--",  1.5),
-    ("argon_shock_ppm_euler",              "PPM Euler n=500",     "tab:orange",   "--",  1.5),
-    ("argon_shock_muscl_navier_stokes",    "MUSCL NS n=500",      "tab:green",    ":",   1.5),
-    ("argon_shock_ppm_navier_stokes",      "PPM NS n=500",        "tab:red",      ":",   1.5),
-    # DG p=2 cases: run with argon_shock_dg_p2_n{500,1000}_quick.yml
-    ("argon_shock_dg_p2_n500_quick",       "DG p=2 n=500",        "tab:purple",   "-",   2.0),
-    ("argon_shock_dg_p2_n1000_quick",      "DG p=2 n=1000",       "darkviolet",   "-",   2.0),
+    ("argon_shock_central_navier_stokes",  "Central NS",          "tab:blue",     "-",   2.0),
+    ("argon_shock_muscl_euler",            "MUSCL Euler",         "tab:cyan",     "--",  2.0),
+    ("argon_shock_ppm_euler",              "PPM Euler",           "tab:olive",    "--",  2.0),
+    ("argon_shock_muscl_navier_stokes",    "MUSCL NS",            "tab:red",      ":",   2.0),
+    ("argon_shock_ppm_navier_stokes",      "PPM NS",              "tab:orange",   ":",   2.0),
+    ("argon_shock_dg_p2_n800_quick",        "SPLAY DG p=2, n=800", "tab:green",    "-",   2.0),
 ]
 
 VARS = ["rho", "u", "p", "T", "Mach", "mu"]
 LABELS = {
-    "x":    "x [m]",
-    "rho":  r"$\rho$ [kg/m³]",
-    "u":    "u [m/s]",
-    "p":    "p [Pa]",
-    "T":    "T [K]",
+    "rho":  r"Density [kg/m³]",
+    "u":    "Velocity [m/s]",
+    "p":    "Pressure [Pa]",
+    "T":    "Temperature [K]",
     "Mach": "Mach",
     "mu":   r"$\mu$ [Pa·s]",
-    "kappa": r"$\kappa$ [W/(m·K)]",
 }
+
+T_SHOCK_MID = 1500.0   # K — shock-centring threshold
 
 
 def find_latest_csv(case_dir):
-    """Find the most recent combined CSV snapshot in case_dir/snapshots/."""
-    snap_dir = os.path.join(case_dir, "snapshots")
-    pattern  = os.path.join(snap_dir, "step_*_combined.csv")
-    files = sorted(glob.glob(pattern))
-    if not files:
-        return None
-    return files[-1]
+    files = sorted(glob.glob(os.path.join(case_dir, "snapshots", "step_*_combined.csv")))
+    return files[-1] if files else None
 
 
 def load_csv(path):
-    """Load a SPLAY CSV snapshot into a dict of arrays."""
-    data = {}
+    """Load snapshot CSV.  DG files (have 'cell' column) keep original row order;
+    FVM files are sorted by x."""
+    rows, header = [], None
     with open(path) as f:
         for line in f:
-            if line.startswith("#"):
+            line = line.strip()
+            if not line or line.startswith("#"):
                 continue
-            header = [h.strip() for h in line.strip().split(",")]
-            break
-        rows = []
-        for line in f:
-            rows.append([float(v) for v in line.strip().split(",")])
+            if header is None:
+                header = [h.strip() for h in line.split(",")]
+                continue
+            rows.append([float(v) for v in line.split(",")])
+    if not rows:
+        return None
     arr = np.array(rows)
-    for k, col in enumerate(header):
-        data[col] = arr[:, k]
-    return data
+    d   = {col: arr[:, k] for k, col in enumerate(header)}
+    if "cell" not in d:
+        idx = np.argsort(d["x"])
+        d   = {k: v[idx] for k, v in d.items()}
+    return d
 
 
-def shock_thickness(x, q, lo=0.1, hi=0.9):
-    """
-    Estimate shock thickness as x-distance between 10% and 90% of
-    the total variation in quantity q.
-    """
-    q_min, q_max = q.min(), q.max()
-    if q_max == q_min:
-        return 0.0
-    lo_val = q_min + lo * (q_max - q_min)
-    hi_val = q_min + hi * (q_max - q_min)
-    x_lo = x[np.argmin(np.abs(q - lo_val))]
-    x_hi = x[np.argmin(np.abs(q - hi_val))]
-    return abs(x_hi - x_lo)
+def shock_centre(d):
+    """x [m] where T crosses T_SHOCK_MID, searching from the right."""
+    x = d["x"]
+    T = d["T"]
+    crossings = np.where((T[:-1] - T_SHOCK_MID) * (T[1:] - T_SHOCK_MID) < 0)[0]
+    if len(crossings):
+        i    = crossings[-1]   # rightmost crossing — avoids spurious left-side hits
+        frac = (T_SHOCK_MID - T[i]) / (T[i + 1] - T[i])
+        return x[i] + frac * (x[i + 1] - x[i])
+    rho  = d["rho"]
+    drho = np.zeros_like(rho)
+    drho[1:-1] = (rho[2:] - rho[:-2]) / (x[2:] - x[:-2])
+    drho[0]    = (rho[1]  - rho[0])   / (x[1]  - x[0])
+    drho[-1]   = (rho[-1] - rho[-2])  / (x[-1] - x[-2])
+    return x[np.argmax(np.abs(drho))]
+
+
+def make_by_cell(d, xc_m, half_um, col):
+    """Build (x_rel [µm], y) with NaN breaks between DG cells."""
+    x_rel = (d["x"] - xc_m) * 1e6
+    cells = d["cell"].astype(int)
+    x_out, y_out = [], []
+    for c in np.unique(cells):
+        mask   = cells == c
+        xc_pts = x_rel[mask]
+        y_pts  = d[col][mask]
+        order  = np.argsort(xc_pts)
+        xc_pts = xc_pts[order]
+        y_pts  = y_pts[order]
+        if np.any(np.abs(xc_pts) <= half_um):
+            x_out.extend(xc_pts.tolist())
+            y_out.extend(y_pts.tolist())
+        x_out.append(np.nan)
+        y_out.append(np.nan)
+    return np.array(x_out), np.array(y_out)
 
 
 def main():
-    print(f"Reading output from: {OUTPUT_DIR}")
+    parser = argparse.ArgumentParser(description="SPLAY tutorial comparison plot")
+    parser.add_argument("--output_dir", default=DEFAULT_OUTPUT)
+    parser.add_argument("--window", type=float, default=0.1,
+                        help="Half-width of x window [µm] (default 0.1)")
+    parser.add_argument("--save", default="",
+                        help="Save path (default: output_dir/argon_shock_comparison.png)")
+    args = parser.parse_args()
+
+    half_um = args.window
+
+    print(f"Reading output from: {args.output_dir}")
 
     datasets = {}
-    for case_name, label, color, ls, lw in CASES:
-        case_dir = os.path.join(OUTPUT_DIR, case_name)
+    for case_name, label, *_ in CASES:
+        case_dir = os.path.join(args.output_dir, case_name)
         csv_path = find_latest_csv(case_dir)
         if csv_path is None:
-            print(f"  [skip] No combined CSV found for {case_name}")
+            print(f"  [skip] {label}")
             continue
-        print(f"  [{case_name}] {csv_path}")
-        datasets[case_name] = load_csv(csv_path)
+        d = load_csv(csv_path)
+        if d is not None:
+            datasets[case_name] = d
+            xc = shock_centre(d)
+            print(f"  {label}: {os.path.basename(csv_path)}"
+                  f"  shock@{xc*1e6:.3f} µm")
 
     if not datasets:
-        print("No data found.  Run the tutorial cases first.")
+        print("No data found. Run the tutorial cases first.")
         sys.exit(1)
 
-    # ── Comparison plot ──────────────────────────────────────────────────────
-    fig, axes = plt.subplots(2, 3, figsize=(15, 8))
+    fig, axes = plt.subplots(2, 3, figsize=(15, 8), constrained_layout=True)
     axes = axes.flatten()
-    plot_vars = ["rho", "u", "p", "T", "Mach", "mu"]
 
-    # Auto-detect shock x-centre from density in the first available dataset.
-    shock_centre_um = None
-    for case_name, *_ in CASES:
-        if case_name in datasets:
-            d0   = datasets[case_name]
-            rho  = d0["rho"]
-            x_um = d0["x"] * 1e6
-            mid  = 0.5 * (rho.min() + rho.max())
-            idx  = np.argmin(np.abs(rho - mid))
-            shock_centre_um = x_um[idx]
-            break
-
-    for ax, var in zip(axes, plot_vars):
+    for ax, var in zip(axes, VARS):
         for case_name, label, color, ls, lw in CASES:
             if case_name not in datasets:
                 continue
-            d = datasets[case_name]
-            x = d["x"] * 1e6  # convert to micrometres for readability
-            ax.plot(x, d[var], color=color, ls=ls, lw=lw, label=label)
-        ax.set_xlabel("x [µm]")
-        ax.set_ylabel(LABELS.get(var, var))
-        ax.set_title(LABELS.get(var, var))
-        ax.legend(fontsize=7)
-        ax.grid(True, alpha=0.3)
-        if shock_centre_um is not None:
-            ax.set_xlim([shock_centre_um - 0.2, shock_centre_um + 0.2])
+            d  = datasets[case_name]
+            xc = shock_centre(d)
 
-    fig.suptitle("SPLAY: Argon shock comparison (M≈5.03)", fontsize=13)
-    plt.tight_layout()
-    out_png = os.path.join(OUTPUT_DIR, "argon_shock_comparison.png")
-    plt.savefig(out_png, dpi=150)
-    print(f"\nSaved: {out_png}")
+            if "cell" in d:
+                xp, yp = make_by_cell(d, xc, half_um, var)
+                ax.plot(xp, yp, color=color, ls=ls, lw=lw, label=label, zorder=3)
+            else:
+                x_rel = (d["x"] - xc) * 1e6
+                mask  = np.abs(x_rel) <= half_um
+                ax.plot(x_rel[mask], d[var][mask],
+                        color=color, ls=ls, lw=lw, label=label, zorder=3)
+
+        ax.set_xlabel("x − x_shock  [µm]", fontsize=10)
+        ax.set_ylabel(LABELS.get(var, var), fontsize=10)
+        ax.set_xlim(-half_um, half_um)
+        ax.ticklabel_format(style="sci", axis="y", scilimits=(-2, 4))
+        ax.axvline(0, color="k", lw=0.6, ls=":", alpha=0.35)
+        ax.grid(True, alpha=0.22, linestyle=":")
+        ax.tick_params(labelsize=9)
+        ax.legend(fontsize=7, loc="best", framealpha=0.85)
+
+    fig.suptitle(
+        f"Argon shock comparison — M ≈ 5.03\n"
+        f"Centred at T = {T_SHOCK_MID:.0f} K  |  ±{half_um:.2f} µm",
+        fontsize=12, fontweight="bold"
+    )
+
+    save_path = args.save or os.path.join(args.output_dir, "argon_shock_comparison.png")
+    fig.savefig(save_path, dpi=300, bbox_inches="tight")
+    print(f"\nSaved: {save_path}")
     plt.show()
 
-    # ── Shock thickness estimate ──────────────────────────────────────────────
-    print("\nShock thickness estimates (10%–90% density variation):")
-    print(f"  {'Case':<45}  {'delta_x [µm]':>12}  {'dx [µm]':>8}  {'cells':>6}")
+    # ── Shock thickness summary ───────────────────────────────────────────────
+    print(f"\nShock thickness  L = |Δp| / |dp/dx|_max  (±{half_um:.2f} µm window):")
+    print(f"  {'Case':<35}  {'L [nm]':>8}  {'N pts':>7}  {'dx [nm]':>8}")
     for case_name, label, *_ in CASES:
         if case_name not in datasets:
             continue
-        d = datasets[case_name]
-        x = d["x"]
-        dx = x[1] - x[0] if len(x) > 1 else 1.0
-        thick = shock_thickness(x, d["rho"])
-        ncells = thick / dx if dx > 0 else 0.0
-        print(f"  {label:<45}  {thick*1e6:>12.4f}  {dx*1e6:>8.4f}  {ncells:>6.1f}")
-
-    # ── Min/max sanity check ─────────────────────────────────────────────────
-    print("\nMin/max sanity check:")
-    for case_name, label, *_ in CASES:
-        if case_name not in datasets:
+        d  = datasets[case_name]
+        xc = shock_centre(d)
+        x_rel = (d["x"] - xc) * 1e6
+        mask  = np.abs(x_rel) <= half_um
+        xi = d["x"][mask]
+        pi = d["p"][mask]
+        if len(xi) < 3:
             continue
-        d = datasets[case_name]
-        nonphys = []
-        if np.any(d["rho"] <= 0): nonphys.append("rho<=0")
-        if np.any(d["p"]   <= 0): nonphys.append("p<=0")
-        if np.any(d["T"]   <= 0): nonphys.append("T<=0")
-        status = "OK" if not nonphys else "NONPHYSICAL: " + ", ".join(nonphys)
-        print(f"  {label:<45} {status}")
+        dpi = np.zeros_like(pi)
+        dpi[1:-1] = (pi[2:] - pi[:-2]) / (xi[2:] - xi[:-2])
+        dpi[0]    = (-3*pi[0] + 4*pi[1] - pi[2])    / (xi[2]  - xi[0])
+        dpi[-1]   = ( 3*pi[-1] - 4*pi[-2] + pi[-3]) / (xi[-1] - xi[-3])
+        mx = np.max(np.abs(dpi))
+        if mx < 1e-10:
+            continue
+        L  = abs((pi[0] - pi[-1]) / mx)
+        dx = (xi[-1] - xi[0]) / max(len(xi) - 1, 1)
+        print(f"  {label:<35}  {L*1e9:>8.1f}  {len(xi):>7d}  {dx*1e9:>8.2f}")
 
 
 if __name__ == "__main__":
