@@ -29,8 +29,8 @@ DEFAULT_OUTPUT = os.path.join(REPO_ROOT, "output")
 # ── FVM reference cases ────────────────────────────────────────────────────────
 # (case_name, label, color, linestyle, linewidth, alpha)
 FVM_CASES = [
-    ("argon_shock_central_navier_stokes",  "Central NS",  "tab:blue",    "-",   2.0, 0.85),
-    ("argon_shock_ppm_navier_stokes",      "PPM NS",      "tab:orange",  "--",  2.0, 0.85),
+    ("argon_shock_central_navier_stokes",  "Central NS",  "tab:blue",    "-.",  2.0, 0.85),
+    ("argon_shock_ppm_navier_stokes",      "PPM NS",      "tab:orange",  "-.",  2.0, 0.85),
     ("argon_shock_muscl_navier_stokes",    "MUSCL NS",    "tab:red",     ":",   2.0, 0.85),
 ]
 
@@ -122,7 +122,7 @@ def make_by_cell(d, xc_m, half_um, col):
 
 
 def plot_figure(axes, half_um, fvm_datasets, dg_splay, ref_dg, md_data,
-                include_dg_splay):
+                pelec_data, include_dg_splay):
     """Populate a row of axes (one per variable).
 
     Layer order when include_dg_splay=True:
@@ -155,6 +155,13 @@ def plot_figure(axes, half_um, fvm_datasets, dg_splay, ref_dg, md_data,
             ax.plot(x_rel[mask], d[col_key][mask],
                     color=color, ls=ls, lw=lw, alpha=alpha,
                     label=label, zorder=3)
+
+        # ── PeleC ─────────────────────────────────────────────────────────────
+        if pelec_data is not None:
+            mask = np.abs(pelec_data["x_rel"]) <= half_um
+            ax.plot(pelec_data["x_rel"][mask], pelec_data[col_key][mask],
+                    color="k", ls="--", lw=2.0, alpha=0.9,
+                    label="PeleC PPM NS", zorder=4)
 
         # ── T panel: Ref DG npy and MD ────────────────────────────────────────
         if col_key == "T":
@@ -245,6 +252,35 @@ def main():
         ref_dg = {"x_rel": xrel[mask], "T": rT[mask]}
         print(f"  Reference DG (.npy): {len(rx)} pts  shock@{rxc*1e6:.3f} µm")
 
+    # ── Load PeleC npy data ───────────────────────────────────────────────────
+    pelec_data = None
+    pelec_dir  = os.path.join(SCRIPT_DIR, "PELEC")
+    pelec_files = {
+        "x_m":   os.path.join(pelec_dir, "x_m.npy"),
+        "x_rel": os.path.join(pelec_dir, "x_rel_um.npy"),
+        "T":     os.path.join(pelec_dir, "T_K.npy"),
+        "rho":   os.path.join(pelec_dir, "rho_kgm3.npy"),
+        "p":     os.path.join(pelec_dir, "p_Pa.npy"),
+        "u":     os.path.join(pelec_dir, "u_ms.npy"),
+    }
+    if all(os.path.exists(v) for v in pelec_files.values()):
+        pd = {k: np.load(v) for k, v in pelec_files.items()}
+        # re-centre using T=1500 K crossing (from the right) for consistency
+        T_p = pd["T"]
+        x_p = pd["x_m"]
+        crossings = np.where((T_p[:-1] - T_SHOCK_MID) * (T_p[1:] - T_SHOCK_MID) < 0)[0]
+        if len(crossings):
+            ci   = crossings[-1]
+            frac = (T_SHOCK_MID - T_p[ci]) / (T_p[ci + 1] - T_p[ci])
+            xc_p = x_p[ci] + frac * (x_p[ci + 1] - x_p[ci])
+        else:
+            xc_p = x_p[np.argmax(np.abs(np.gradient(T_p, x_p)))]
+        pd["x_rel"] = (x_p - xc_p) * 1e6
+        pelec_data  = pd
+        print(f"  PeleC: {len(x_p)} pts  shock@{xc_p*1e6:.3f} µm")
+    else:
+        print("  [skip] PeleC npy files not found in tutorials/argon_target_shock/PELEC/")
+
     if not fvm_datasets and not dg_splay:
         print("\nNo data found.")
         sys.exit(1)
@@ -259,7 +295,7 @@ def main():
         fontsize=11, fontweight="bold"
     )
     plot_figure(axes1, half_um, fvm_datasets, dg_splay, ref_dg, md_data,
-                include_dg_splay=True)
+                pelec_data, include_dg_splay=True)
 
     # ── Figure 2: FVM only (+ Ref DG + MD) ────────────────────────────────────
     fig2, axes2 = plt.subplots(1, len(VARS), figsize=(5.2 * len(VARS), 5.2),
@@ -270,7 +306,7 @@ def main():
         fontsize=11, fontweight="bold"
     )
     plot_figure(axes2, half_um, fvm_datasets, dg_splay, ref_dg, md_data,
-                include_dg_splay=False)
+                pelec_data, include_dg_splay=False)
 
     # ── Save or show ──────────────────────────────────────────────────────────
     if args.save:
