@@ -30,11 +30,13 @@ struct FaceStates {
 /// Works on cell index range [face_begin, face_end).
 /// face_begin is the first face index to reconstruct (= interior_begin - 1 typically).
 ///
-/// flatten / flatten_z1 / flatten_z2:
+/// flatten / flatten_z1 / flatten_z2 / flatten_shktst:
 ///   CW84 §4 / PeleC-style shock flattening.  When flatten=true, face states are
 ///   blended toward the cell average near strong shocks (large dp_near/dp_far ratio
 ///   with converging flow).  z1 and z2 are the lower/upper pressure-ratio thresholds
-///   for the linear ramp (chi=0 → chi=1).  PeleC defaults: z1=0.75, z2=0.85.
+///   for the linear ramp (chi=0 → chi=1).  shktst is the PeleC shock-strength gate:
+///   flattening is suppressed if |dp|/min(p[±1]) <= shktst (PeleC default: 0.33).
+///   PeleC defaults: z1=0.75, z2=0.85, shktst=0.33.
 void reconstruct(
     const std::vector<double>& rho,
     const std::vector<double>& u,
@@ -46,9 +48,10 @@ void reconstruct(
     int            face_begin,
     int            face_end,
     FaceStates&    fs,
-    bool           flatten    = false,
-    double         flatten_z1 = 0.75,
-    double         flatten_z2 = 0.85);
+    bool           flatten        = false,
+    double         flatten_z1     = 0.75,
+    double         flatten_z2     = 0.85,
+    double         flatten_shktst = 0.33);
 
 // ── Individual limiters ────────────────────────────────────────────────────
 double limiter_minmod(double r);

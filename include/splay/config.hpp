@@ -96,9 +96,11 @@ struct SolverConfig {
     Limiter        limiter           = Limiter::None;
     // CW84/PeleC-style shock flattening: blends face states toward cell averages
     // near strong shocks (detected by pressure-ratio criterion + converging flow).
-    bool   flatten    = false;  // enable flattening
-    double flatten_z1 = 0.75;   // lower pressure-ratio threshold (start of ramp)
-    double flatten_z2 = 0.85;   // upper pressure-ratio threshold (fully flattened)
+    bool   flatten        = false;  // enable flattening
+    double flatten_z1     = 0.75;   // lower pressure-ratio threshold (start of ramp)
+    double flatten_z2     = 0.85;   // upper pressure-ratio threshold (fully flattened)
+    double flatten_shktst = 0.33;   // PeleC shktst: |dp|/min(p[±1]) must exceed this
+                                    // before flattening is applied (0 = always flatten)
     // Godunov operator splitting: advance inviscid+flatten first (SSPRK3), then
     // viscous diffusion separately (explicit Euler).  When false (default) both
     // operators are combined in the same RK residual each stage.

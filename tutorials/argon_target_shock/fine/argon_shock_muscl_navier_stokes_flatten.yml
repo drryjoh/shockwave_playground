@@ -43,6 +43,7 @@ solver:
   flatten: true
   flatten_z1: 0.75
   flatten_z2: 0.85
+  flatten_shktst: 0.33     # PeleC shktst: |dp|/min(p[±1]) gate (PeleC default)
 
 diagnostics:
   log.step: 100

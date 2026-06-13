@@ -60,12 +60,12 @@ void compute_residual(
                 gas.gamma, gas.R,
                 dt, m.dx,
                 face_begin, face_end, fs,
-                cfg.flatten, cfg.flatten_z1, cfg.flatten_z2);
+                cfg.flatten, cfg.flatten_z1, cfg.flatten_z2, cfg.flatten_shktst);
         } else {
             reconstruct(s.rho, s.u, s.p, s.T,
                         cfg.inviscid_scheme, cfg.limiter, gas.gamma,
                         face_begin, face_end, fs,
-                        cfg.flatten, cfg.flatten_z1, cfg.flatten_z2);
+                        cfg.flatten, cfg.flatten_z1, cfg.flatten_z2, cfg.flatten_shktst);
         }
 
         for (int f = face_begin; f < face_end; ++f) {

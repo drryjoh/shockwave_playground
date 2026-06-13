@@ -37,9 +37,11 @@ namespace splay {
 /// @param face_begin   first face index to reconstruct
 /// @param face_end     one-past-last face index
 /// @param fs           output FaceStates (pre-allocated to n_total)
-/// @param flatten      enable CW84/PeleC-style shock flattening
-/// @param flatten_z1   lower pressure-ratio threshold (ramp start)
-/// @param flatten_z2   upper pressure-ratio threshold (fully flattened)
+/// @param flatten        enable CW84/PeleC-style shock flattening
+/// @param flatten_z1     lower pressure-ratio threshold (ramp start)
+/// @param flatten_z2     upper pressure-ratio threshold (fully flattened)
+/// @param flatten_shktst PeleC shktst gate: |dp|/min(p[±1]) must exceed this
+///                       before flattening is applied (PeleC default: 0.33)
 void reconstruct_ppm_pele(
     const std::vector<double>& rho,
     const std::vector<double>& u,
@@ -52,8 +54,9 @@ void reconstruct_ppm_pele(
     int    face_begin,
     int    face_end,
     FaceStates& fs,
-    bool   flatten    = false,
-    double flatten_z1 = 0.75,
-    double flatten_z2 = 0.85);
+    bool   flatten        = false,
+    double flatten_z1     = 0.75,
+    double flatten_z2     = 0.85,
+    double flatten_shktst = 0.33);
 
 } // namespace splay

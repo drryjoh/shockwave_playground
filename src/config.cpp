@@ -153,11 +153,14 @@ Config load_config(const std::string& yaml_path, const std::string& restart_path
         cfg.solver.riemann_solver  = parse_riemann_solver(rs);
         cfg.solver.limiter         = parse_limiter(lim);
 
-        cfg.solver.flatten    = optional<bool>  (solver_node, "flatten",    false);
-        cfg.solver.flatten_z1 = optional<double>(solver_node, "flatten_z1", 0.75);
-        cfg.solver.flatten_z2 = optional<double>(solver_node, "flatten_z2", 0.85);
+        cfg.solver.flatten        = optional<bool>  (solver_node, "flatten",        false);
+        cfg.solver.flatten_z1     = optional<double>(solver_node, "flatten_z1",     0.75);
+        cfg.solver.flatten_z2     = optional<double>(solver_node, "flatten_z2",     0.85);
+        cfg.solver.flatten_shktst = optional<double>(solver_node, "flatten_shktst", 0.33);
         if (cfg.solver.flatten_z1 >= cfg.solver.flatten_z2)
             throw std::runtime_error("solver.flatten_z1 must be < flatten_z2.");
+        if (cfg.solver.flatten_shktst < 0.0)
+            throw std::runtime_error("solver.flatten_shktst must be >= 0.");
 
         cfg.solver.operator_splitting = optional<bool>(solver_node, "splitting", false);
 

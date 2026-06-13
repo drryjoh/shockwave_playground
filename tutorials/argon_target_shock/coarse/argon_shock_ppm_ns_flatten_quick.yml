@@ -46,8 +46,9 @@ solver:
   riemann_solver: hllc
   limiter: ppm
   flatten: true            # PeleC-like: shock captured despite viscous terms
-  flatten_z1: 0.75
-  flatten_z2: 0.85
+  flatten_z1: 0.75         # lower pressure-ratio threshold (PeleC default)
+  flatten_z2: 0.85         # upper pressure-ratio threshold (PeleC default)
+  flatten_shktst: 0.33     # PeleC shktst: |dp|/min(p[±1]) gate (PeleC default)
 
 diagnostics:
   log.step: 20

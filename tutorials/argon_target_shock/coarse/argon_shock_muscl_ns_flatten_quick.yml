@@ -41,9 +41,10 @@ solver:
   inviscid_scheme: muscl
   riemann_solver: hllc
   limiter: minmod
-  flatten: true
-  flatten_z1: 0.75
-  flatten_z2: 0.85
+  flatten: true            # CW84/PeleC-style shock flattening
+  flatten_z1: 0.75         # lower pressure-ratio threshold (PeleC default)
+  flatten_z2: 0.85         # upper pressure-ratio threshold (PeleC default)
+  flatten_shktst: 0.33     # PeleC shktst: |dp|/min(p[±1]) gate (PeleC default)
 
 diagnostics:
   log.step: 20

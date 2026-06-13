@@ -76,7 +76,7 @@ static inline double pavg_left(
 static std::vector<double> compute_flattening_pele(
     const std::vector<double>& p,
     const std::vector<double>& u,
-    int n, double z1, double z2)
+    int n, double z1, double z2, double shktst)
 {
     std::vector<double> chi(n, 0.0);
     for (int i = 2; i < n - 2; ++i) {
@@ -84,6 +84,9 @@ static std::vector<double> compute_flattening_pele(
         const double dp_near = std::abs(p[i+1] - p[i-1]);
         const double dp_far  = std::abs(p[i+2] - p[i-2]);
         if (dp_far < 1e-14) continue;
+        // PeleC shktst gate: suppress flattening for weak pressure perturbations.
+        const double p_min = std::min(p[i+1], p[i-1]);
+        if (p_min > 0.0 && dp_near / p_min <= shktst) continue;
         const double zeta = dp_near / dp_far;
         chi[i] = std::max(0.0, std::min(1.0, (zeta - z1) / (z2 - z1)));
     }
@@ -108,7 +111,8 @@ void reconstruct_ppm_pele(
     FaceStates& fs,
     bool   flatten,
     double flatten_z1,
-    double flatten_z2)
+    double flatten_z2,
+    double flatten_shktst)
 {
     const int n = static_cast<int>(rho.size());
     const double dt_dx = (dx > 0.0) ? dt / dx : 0.0;
@@ -240,7 +244,7 @@ void reconstruct_ppm_pele(
     // Applied after tracing: blends traced face states toward cell averages
     // near strong shocks detected by the pressure-ratio criterion.
     if (flatten) {
-        const auto chi = compute_flattening_pele(p, u, n, flatten_z1, flatten_z2);
+        const auto chi = compute_flattening_pele(p, u, n, flatten_z1, flatten_z2, flatten_shktst);
         for (int f = face_begin; f < face_end; ++f) {
             const double cf  = chi[f];
             const double cf1 = chi[f + 1];

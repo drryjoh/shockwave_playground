@@ -44,7 +44,7 @@ for case in "${CASES[@]}"; do
     echo "========================================"
     echo "  Running: $case"
     echo "========================================"
-    "$SPLAY" "$TUTORIAL_DIR/${case}.yml"
+    "$SPLAY" "$TUTORIAL_DIR/coarse/${case}.yml"
     echo ""
 done
 
